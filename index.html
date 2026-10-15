@@ -1,0 +1,2028 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#FAF7F2" />
+    <title>TALK-CATCH - 메신저 대화 속마음 포착</title>
+    <meta name="description" content="카톡 캡처와 대화 파일을 분석해 상대방의 속마음과 관계 온도를 읽고 맞춤 답장을 추천하는 서비스" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
+              jua: ['Jua', 'Pretendard', 'sans-serif'],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        background-color: #FAF7F2;
+        color: #1C1917;
+        -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
+      }
+      .font-jua { font-family: 'Jua', 'Pretendard', sans-serif; font-weight: 400; }
+      .break-keep { word-break: keep-all; overflow-wrap: anywhere; }
+      button { -webkit-user-select: none; user-select: none; }
+      img { -webkit-user-drag: none; }
+
+      /* ---------- Loading: reading cat motion ---------- */
+      .cat-stage { position: relative; width: 150px; height: 150px; }
+      .cat-sway { position: absolute; inset: 0; animation: catSway 2.4s ease-in-out infinite; transform-origin: 50% 80%; }
+      .cat-sway img { width: 100%; height: 100%; object-fit: contain; display: block; }
+      @keyframes catSway {
+        0%, 100% { transform: translateX(0) rotate(0deg); }
+        25% { transform: translateX(-3px) rotate(-1.5deg); }
+        75% { transform: translateX(3px) rotate(1.5deg); }
+      }
+      .paper-layer {
+        position: absolute; inset: 0; pointer-events: none;
+        clip-path: polygon(5% 57%, 50% 53%, 61% 88%, 27% 92%);
+      }
+      .paper-line {
+        position: absolute; height: 3px; border-radius: 3px; background: #C9C2B8;
+        transform: rotate(-6deg); transform-origin: left center; overflow: hidden;
+      }
+      .paper-line::after {
+        content: ''; position: absolute; top: -2px; bottom: -2px; left: -60%; width: 60%;
+        background: rgba(255, 100, 82, 0.55); border-radius: 3px;
+        animation: lineHighlight 2.4s linear infinite;
+      }
+      .paper-line.l1 { left: 10%; top: 62%; width: 36%; }
+      .paper-line.l2 { left: 14%; top: 69%; width: 38%; }
+      .paper-line.l3 { left: 18%; top: 76%; width: 37%; }
+      .paper-line.l4 { left: 22%; top: 83%; width: 30%; }
+      .paper-line.l1::after { animation-delay: 0s; }
+      .paper-line.l2::after { animation-delay: 0.6s; }
+      .paper-line.l3::after { animation-delay: 1.2s; }
+      .paper-line.l4::after { animation-delay: 1.8s; }
+      @keyframes lineHighlight {
+        0% { left: -60%; opacity: 1; }
+        25% { left: 100%; opacity: 1; }
+        25.1%, 100% { left: 100%; opacity: 0; }
+      }
+      .glasses-glint {
+        position: absolute; left: 19%; top: 32%; width: 43%; height: 15%;
+        overflow: hidden; pointer-events: none; border-radius: 6px;
+      }
+      .glasses-glint::after {
+        content: ''; position: absolute; top: -50%; bottom: -50%; width: 18%; left: -30%;
+        background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.75), rgba(255,255,255,0));
+        transform: skewX(-20deg);
+        animation: glint 2.4s ease-in-out infinite;
+      }
+      @keyframes glint {
+        0%, 55% { left: -30%; }
+        85%, 100% { left: 130%; }
+      }
+
+      /* ---------- Misc animations ---------- */
+      @keyframes shakeBox {
+        0%, 100% { transform: translateX(0); }
+        20%, 60% { transform: translateX(-6px); }
+        40%, 80% { transform: translateX(6px); }
+      }
+      .animate-shake { animation: shakeBox 0.4s ease-in-out; }
+      @keyframes fadeUpCard {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .fade-up-card { animation: fadeUpCard 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+      @keyframes popIn {
+        0% { transform: scale(0.85); }
+        60% { transform: scale(1.08); }
+        100% { transform: scale(1); }
+      }
+      .pop-in { animation: popIn 0.35s ease-out; }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+        .cat-sway, .paper-line::after, .glasses-glint::after { animation: none !important; }
+      }
+    </style>
+  </head>
+  <body class="min-h-[100dvh] antialiased">
+    <!-- KakaoTalk in-app browser notice -->
+    <div id="kakaoBanner" class="hidden items-center justify-between gap-2 px-4 py-2.5 bg-[#FEF5E7] text-[#B45309] border-b border-[#EDE6DC] text-xs">
+      <span class="min-w-0 break-keep font-medium">이미지 저장이 안 되면 사파리·크롬으로 열어주세요</span>
+      <button id="btnCloseKakaoBanner" type="button" aria-label="닫기" class="w-8 h-8 shrink-0 flex items-center justify-center">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+      </button>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed left-1/2 -translate-x-1/2 z-[60] hidden items-center gap-2 bg-[#57534E] text-white text-sm font-medium px-4 py-2.5 rounded-full shadow-lg max-w-[calc(100vw-32px)]" style="top: calc(12px + env(safe-area-inset-top));">
+      <span class="w-1.5 h-1.5 rounded-full bg-[#FF6452] shrink-0"></span>
+      <span id="toastText" class="break-keep"></span>
+    </div>
+
+    <div class="w-full flex justify-center">
+      <div id="appShell" class="w-full max-w-[430px] min-h-[100dvh] flex flex-col" style="padding-top: env(safe-area-inset-top); padding-bottom: calc(88px + env(safe-area-inset-bottom));">
+
+        <!-- Header -->
+        <header class="sticky top-0 z-30 flex items-center justify-between gap-2 px-4 h-14 bg-[#FAF7F2]/95 backdrop-blur border-b border-[#EDE6DC]">
+          <div class="flex items-center gap-2 min-w-0">
+            <img src="https://raw.githubusercontent.com/aszxazs-a11y/image/main/talkcatch-cat-face.png" alt="" crossorigin="anonymous" class="w-8 h-8 object-contain shrink-0" onerror="this.style.visibility='hidden'" />
+            <span class="font-jua text-[19px] leading-none text-[#1C1917] truncate">TALK-CATCH</span>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <div class="flex p-1 bg-[#F5EFE6] rounded-xl">
+              <button id="navTabAnalyze" type="button" class="h-8 px-3 rounded-lg text-[13px] font-bold bg-[#FF6452] text-white">해독</button>
+              <button id="navTabHistory" type="button" class="h-8 px-2.5 rounded-lg text-[13px] font-semibold text-[#78716C] whitespace-nowrap">기록 <span id="navHistoryLabel">0</span></button>
+            </div>
+            <button id="btnOpenKeyModal" type="button" aria-label="API 키 설정" class="w-10 h-10 rounded-xl border border-[#EDE6DC] bg-white text-[#78716C] flex items-center justify-center">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
+            </button>
+          </div>
+        </header>
+
+        <main class="flex-1 px-4 pt-4 flex flex-col gap-5">
+
+          <!-- ================= INPUT VIEW ================= -->
+          <section id="viewInput" class="flex flex-col gap-5">
+
+            <!-- Hero -->
+            <div class="rounded-[20px] px-4 py-3.5 bg-white border border-[#EDE6DC] flex items-center gap-3">
+              <div class="flex-1 min-w-0">
+                <h1 class="font-jua text-[21px] leading-snug text-[#1C1917] break-keep">말투 속에 숨은 진짜 속마음</h1>
+                <p class="text-[13px] text-[#78716C] mt-1 leading-snug break-keep">캡처 한 장으로 관계 온도와 답장을 알려드려요</p>
+              </div>
+              <img src="https://raw.githubusercontent.com/aszxazs-a11y/image/main/talkcatch-cat-reading.png" alt="" crossorigin="anonymous" class="w-16 h-16 object-contain shrink-0" onerror="this.style.visibility='hidden'" />
+            </div>
+
+            <!-- 1. Mode -->
+            <div class="grid grid-cols-2 gap-1 p-1 bg-[#F5EFE6] rounded-2xl">
+              <button type="button" id="btnModeCapture" class="mode-btn h-11 rounded-xl text-[14px] font-bold flex items-center justify-center gap-1.5 min-w-0 px-2">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+                <span class="truncate">캡처로 해독</span>
+              </button>
+              <button type="button" id="btnModeFile" class="mode-btn h-11 rounded-xl text-[14px] font-bold flex items-center justify-center gap-1.5 min-w-0 px-2">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                <span class="truncate">대화 파일 심층</span>
+              </button>
+            </div>
+
+            <!-- 2-A. Capture upload -->
+            <div id="sectionCapture" class="flex flex-col gap-2">
+              <input type="file" id="captureFileInput" accept="image/*" class="hidden" />
+              <button type="button" id="captureDropzone" class="w-full h-[140px] rounded-[20px] border-2 border-dashed border-[#E3D9CC] bg-white flex flex-col items-center justify-center gap-1.5 px-4 text-center">
+                <span class="w-10 h-10 rounded-full bg-[#FFF0EC] text-[#FF6452] flex items-center justify-center">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                </span>
+                <span class="text-[15px] font-bold text-[#1C1917]">대화 캡처 올리기</span>
+                <span class="text-[13px] text-[#78716C]">앨범에서 선택</span>
+              </button>
+              <div id="capturePreviewBox" class="hidden relative rounded-[20px] overflow-hidden border border-[#EDE6DC] bg-[#F5EFE6]">
+                <img id="capturePreviewImg" alt="대화 캡처 미리보기" class="w-full max-h-[260px] object-contain block" />
+                <div class="absolute bottom-2 right-2 flex gap-1.5">
+                  <button type="button" id="btnChangeCapture" class="h-10 px-3.5 rounded-xl bg-white/95 border border-[#EDE6DC] text-[13px] font-bold text-[#1C1917]">사진 변경</button>
+                  <button type="button" id="btnRemoveCapture" class="h-10 px-3 rounded-xl bg-white/95 border border-[#EDE6DC] text-[13px] font-semibold text-[#57534E]">삭제</button>
+                </div>
+              </div>
+              <div id="invalidChatBox" class="hidden rounded-[16px] p-3.5 bg-red-50 border border-red-200 flex-col gap-1">
+                <span class="text-[14px] font-bold text-red-800">대화 캡처가 아닌 것 같아요</span>
+                <p id="invalidReasonTxt" class="text-[13px] text-red-700 leading-relaxed break-keep">말풍선이 잘 보이는 카톡·DM 캡처를 올려주세요.</p>
+              </div>
+            </div>
+
+            <!-- 2-B. File upload -->
+            <div id="sectionFile" class="hidden flex-col gap-2">
+              <div class="rounded-[16px] bg-white border border-[#EDE6DC]">
+                <button type="button" id="btnToggleGuide" class="w-full h-11 px-4 flex items-center justify-between text-[14px] font-bold text-[#1C1917]">
+                  <span>카톡 대화 파일 내보내는 방법</span>
+                  <svg id="guideChevron" class="w-4 h-4 text-[#78716C] transition-transform" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9" /></svg>
+                </button>
+                <div id="guideContent" class="hidden px-4 pb-3.5 text-[13px] text-[#57534E] leading-relaxed break-keep">
+                  카톡 대화방 메뉴(≡) → 설정 → 대화 내용 내보내기 → 텍스트 파일 저장<br />
+                  <span class="text-[#78716C]">버전에 따라 메뉴 이름이 조금 다를 수 있어요.</span>
+                </div>
+              </div>
+              <input type="file" id="txtFileInput" accept=".txt,text/plain" class="hidden" />
+              <button type="button" id="fileDropzone" class="w-full h-[120px] rounded-[20px] border-2 border-dashed border-[#E3D9CC] bg-white flex flex-col items-center justify-center gap-1.5 px-4 text-center">
+                <span class="w-10 h-10 rounded-full bg-[#FFF0EC] text-[#FF6452] flex items-center justify-center">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                </span>
+                <span class="text-[15px] font-bold text-[#1C1917]">카톡 대화(.txt) 올리기</span>
+              </button>
+              <div id="fileNoticeBox" class="hidden rounded-[16px] p-3.5 bg-red-50 border border-red-200 text-[13px] text-red-700 break-keep"></div>
+              <div id="filePreviewCard" class="hidden rounded-[20px] p-4 bg-white border border-[#EDE6DC] flex-col gap-3">
+                <div class="flex items-start justify-between gap-2 pb-3 border-b border-[#EDE6DC]">
+                  <div class="min-w-0">
+                    <p id="fileStatsSummary" class="text-[14px] font-bold text-[#1C1917] break-keep"></p>
+                    <p id="fileStatsSubtitle" class="text-[12px] text-[#78716C] mt-0.5 break-keep"></p>
+                  </div>
+                  <button type="button" id="btnChangeFile" class="h-9 px-3 shrink-0 rounded-lg bg-[#F5EFE6] text-[13px] font-semibold text-[#57534E]">변경</button>
+                </div>
+                <div>
+                  <p class="text-[14px] font-bold text-[#1C1917] mb-2">나는 누구인가요?</p>
+                  <div id="meParticipantChips" class="flex flex-wrap gap-1.5"></div>
+                </div>
+                <div id="partnerSelectContainer" class="hidden">
+                  <p class="text-[14px] font-bold text-[#1C1917] mb-2">분석할 상대는 누구인가요?</p>
+                  <div id="partnerParticipantChips" class="flex flex-wrap gap-1.5"></div>
+                </div>
+              </div>
+            </div>
+
+            <p class="text-[12px] text-[#78716C] text-center -mt-3 break-keep">캡처와 대화 파일은 분석에만 쓰이고 저장되지 않아요</p>
+
+            <!-- 3. Relationship -->
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <span class="font-jua text-[17px] text-[#1C1917]">관계 유형</span>
+                <span id="selectedRelBadge" class="text-[13px] font-semibold text-[#78716C] truncate">선택 안 함</span>
+              </div>
+              <div class="grid grid-cols-3 gap-1.5" id="relChipContainer">
+                <button type="button" data-rel="애인·썸" class="rel-chip h-11 rounded-xl text-[14px] font-semibold min-w-0 px-1 truncate">애인·썸</button>
+                <button type="button" data-rel="직장" class="rel-chip h-11 rounded-xl text-[14px] font-semibold min-w-0 px-1 truncate">직장</button>
+                <button type="button" data-rel="친구" class="rel-chip h-11 rounded-xl text-[14px] font-semibold min-w-0 px-1 truncate">친구</button>
+              </div>
+              <p class="text-[12px] text-[#78716C] mt-1.5 break-keep">한 번 더 누르면 선택이 풀려요. 선택하지 않으면 대화로 관계를 짐작해요.</p>
+            </div>
+
+            <!-- 4. MBTI -->
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <span class="font-jua text-[17px] text-[#1C1917]">상대 MBTI</span>
+                <button type="button" id="btnMbtiUnknown" class="h-8 px-3 rounded-full text-[13px] font-bold shrink-0">모름</button>
+              </div>
+              <div id="mbtiGrid" class="grid grid-cols-4 gap-1.5 transition-opacity">
+                <button type="button" data-axis="0" data-letter="E" class="mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none"><span class="text-[15px] font-black">E</span><span class="text-[11px] mt-0.5">외향</span></button>
+                <button type="button" data-axis="1" data-letter="S" class="mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none"><span class="text-[15px] font-black">S</span><span class="text-[11px] mt-0.5">감각</span></button>
+                <button type="button" data-axis="2" data-letter="T" class="mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none"><span class="text-[15px] font-black">T</span><span class="text-[11px] mt-0.5">사고</span></button>
+                <button type="button" data-axis="3" data-letter="J" class="mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none"><span class="text-[15px] font-black">J</span><span class="text-[11px] mt-0.5">판단</span></button>
+                <button type="button" data-axis="0" data-letter="I" class="mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none"><span class="text-[15px] font-black">I</span><span class="text-[11px] mt-0.5">내향</span></button>
+                <button type="button" data-axis="1" data-letter="N" class="mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none"><span class="text-[15px] font-black">N</span><span class="text-[11px] mt-0.5">직관</span></button>
+                <button type="button" data-axis="2" data-letter="F" class="mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none"><span class="text-[15px] font-black">F</span><span class="text-[11px] mt-0.5">감정</span></button>
+                <button type="button" data-axis="3" data-letter="P" class="mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none"><span class="text-[15px] font-black">P</span><span class="text-[11px] mt-0.5">인식</span></button>
+              </div>
+              <p id="mbtiHelpText" class="text-[12px] text-[#78716C] mt-1.5 break-keep">모르면 비워두세요. 누른 글자를 다시 누르면 선택이 풀려요.</p>
+            </div>
+
+            <!-- Error -->
+            <div id="generalErrorBox" class="hidden rounded-[16px] p-4 bg-red-50 border border-red-200 flex-col gap-1">
+              <span class="text-[14px] font-bold text-red-800">분석하지 못했어요</span>
+              <p id="generalErrorMsg" class="text-[13px] text-red-700 leading-relaxed break-keep"></p>
+              <p id="generalErrorCode" class="hidden text-[12px] text-[#78716C] font-mono break-all"></p>
+            </div>
+          </section>
+
+          <!-- ================= LOADING VIEW ================= -->
+          <section id="viewLoading" class="hidden flex-col items-center gap-4 rounded-[20px] px-4 py-6 bg-white border border-[#EDE6DC] text-center" aria-live="polite">
+            <div class="cat-stage">
+              <div class="cat-sway">
+                <img src="https://raw.githubusercontent.com/aszxazs-a11y/image/main/talkcatch-cat-reading.png" alt="대화를 읽는 고양이" crossorigin="anonymous" onerror="this.style.visibility='hidden'" />
+                <div class="paper-layer">
+                  <span class="paper-line l1"></span><span class="paper-line l2"></span><span class="paper-line l3"></span><span class="paper-line l4"></span>
+                </div>
+                <div class="glasses-glint"></div>
+              </div>
+            </div>
+            <div id="loadingFileStatsBox" class="hidden w-full rounded-xl bg-[#FAF7F2] border border-[#EDE6DC] px-3.5 py-3 text-left flex-col gap-0.5">
+              <span id="loadingFileStatsTitle" class="text-[14px] font-bold text-[#1C1917] break-keep"></span>
+              <span id="loadingFileStatsDetail" class="text-[12px] text-[#78716C] break-keep"></span>
+            </div>
+            <div class="flex flex-col items-center gap-1 w-full">
+              <p id="loadingStepText" class="font-jua text-[19px] text-[#1C1917] break-keep">말풍선 읽는 중</p>
+              <p class="text-[13px] text-[#78716C] break-keep">말투와 답장 간격을 함께 보고 있어요</p>
+            </div>
+            <div class="w-full grid grid-cols-4 gap-1.5 px-4">
+              <span class="prog-bar h-1.5 rounded-full bg-[#F5EFE6]"></span>
+              <span class="prog-bar h-1.5 rounded-full bg-[#F5EFE6]"></span>
+              <span class="prog-bar h-1.5 rounded-full bg-[#F5EFE6]"></span>
+              <span class="prog-bar h-1.5 rounded-full bg-[#F5EFE6]"></span>
+            </div>
+            <p id="loadingLongWaitNotice" class="hidden text-[13px] text-[#78716C] break-keep">조금 더 자세히 살펴보고 있어요</p>
+            <button type="button" id="btnCancelAnalysis" class="hidden h-11 px-5 rounded-xl bg-[#F5EFE6] text-[14px] font-semibold text-[#57534E]">분석 취소</button>
+          </section>
+
+          <!-- ================= RESULT VIEW ================= -->
+          <section id="viewResult" class="hidden flex-col gap-3">
+            <div id="historyBackBar" class="hidden items-center justify-between gap-2">
+              <button type="button" id="btnBackToHistory" class="h-10 px-3 -ml-1 rounded-lg text-[14px] font-semibold text-[#57534E] flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg>
+                기록으로
+              </button>
+              <span id="historyBackDate" class="text-[12px] text-[#78716C] truncate"></span>
+            </div>
+
+            <div class="result-card flex items-center justify-between gap-2 px-1">
+              <span class="font-jua text-[17px] text-[#1C1917]">TALK-CATCH 리포트</span>
+              <span id="reportMeta" class="text-[12px] text-[#78716C] truncate"></span>
+            </div>
+
+            <!-- Score card -->
+            <div id="cardScore" class="result-card rounded-[20px] p-4 bg-white border border-[#EDE6DC] flex flex-col gap-3">
+              <div class="flex items-center gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <span id="scoreTitle" class="text-[13px] font-bold text-[#78716C]">호감도</span>
+                    <span id="scoreBadge" class="text-[12px] font-bold px-2 py-0.5 rounded-full bg-[#FFF0EC] text-[#FF6452] break-keep"></span>
+                  </div>
+                  <div class="flex items-baseline gap-0.5 mt-1">
+                    <span id="scoreValue" class="font-jua text-[52px] leading-none text-[#1C1917]">0</span>
+                    <span class="font-jua text-[22px] text-[#FF6452]">%</span>
+                  </div>
+                  <p id="confidenceLowNote" class="hidden text-[12px] text-[#78716C] mt-1 break-keep">캡처가 짧아서 참고용으로 봐주세요</p>
+                </div>
+                <img id="resultCatImg" alt="결과 고양이" crossorigin="anonymous" class="w-[104px] h-[104px] object-contain shrink-0" />
+              </div>
+              <div class="w-full h-2.5 bg-[#F5EFE6] rounded-full overflow-hidden">
+                <div id="scoreProgressBar" class="h-full rounded-full bg-[#FF6452]" style="width: 0%"></div>
+              </div>
+              <p id="summaryLine" class="text-[15px] font-bold text-[#1C1917] leading-snug break-keep"></p>
+              <div id="statusTagsContainer" class="flex flex-wrap gap-1.5"></div>
+            </div>
+
+            <!-- Everyday card -->
+            <div id="cardEveryday" class="result-card hidden rounded-[20px] p-4 bg-white border border-[#EDE6DC] flex-col gap-3">
+              <div class="flex items-center gap-3">
+                <div class="flex-1 min-w-0">
+                  <span class="text-[12px] font-bold px-2 py-0.5 rounded-full bg-[#FFF0EC] text-[#FF6452]">일상 대화</span>
+                  <p class="font-jua text-[19px] leading-snug text-[#1C1917] mt-2 break-keep">특별한 신호 없이 편안한 대화예요</p>
+                </div>
+                <img id="everydayCatImg" alt="" crossorigin="anonymous" class="w-[96px] h-[96px] object-contain shrink-0" />
+              </div>
+              <p id="everydaySummary" class="text-[14px] text-[#57534E] leading-relaxed break-keep"></p>
+            </div>
+
+            <!-- Timing card -->
+            <div id="cardTiming" class="result-card hidden rounded-[20px] p-4 bg-white border border-[#EDE6DC] flex-col gap-2">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-[13px] font-bold text-[#78716C]">답장 텀 분석</span>
+                <span id="timingBadge" class="text-[12px] font-bold px-2.5 py-0.5 rounded-full bg-[#FEF5E7] text-[#B45309]"></span>
+              </div>
+              <p id="timingText" class="text-[14px] text-[#1C1917] leading-relaxed break-keep"></p>
+            </div>
+
+            <!-- File stats card -->
+            <div id="cardFileStats" class="result-card hidden rounded-[20px] p-4 bg-white border border-[#EDE6DC] flex-col gap-2.5">
+              <span class="text-[13px] font-bold text-[#78716C]">대화 통계</span>
+              <div class="grid grid-cols-2 gap-2">
+                <div class="rounded-xl bg-[#FAF7F2] border border-[#EDE6DC] p-2.5 min-w-0"><p class="text-[12px] text-[#78716C] break-keep">먼저 말 건 비율</p><p id="statStarter" class="text-[14px] font-bold text-[#1C1917] mt-0.5 break-keep"></p></div>
+                <div class="rounded-xl bg-[#FAF7F2] border border-[#EDE6DC] p-2.5 min-w-0"><p class="text-[12px] text-[#78716C] break-keep">평균 답장 시간</p><p id="statReply" class="text-[14px] font-bold text-[#1C1917] mt-0.5 break-keep"></p></div>
+                <div class="rounded-xl bg-[#FAF7F2] border border-[#EDE6DC] p-2.5 min-w-0"><p class="text-[12px] text-[#78716C] break-keep">상대 질문 비율</p><p id="statQuestion" class="text-[14px] font-bold text-[#1C1917] mt-0.5 break-keep"></p></div>
+                <div class="rounded-xl bg-[#FAF7F2] border border-[#EDE6DC] p-2.5 min-w-0"><p class="text-[12px] text-[#78716C] break-keep">최근 30일 흐름</p><p id="statTrend" class="text-[14px] font-bold text-[#1C1917] mt-0.5 break-keep"></p></div>
+              </div>
+            </div>
+
+            <!-- Subtext -->
+            <div id="cardSubtext" class="result-card rounded-[20px] p-4 bg-white border border-[#EDE6DC] flex flex-col gap-1.5">
+              <span class="text-[13px] font-bold text-[#78716C]">속마음 해석</span>
+              <p id="subtextValue" class="text-[14px] text-[#1C1917] leading-relaxed whitespace-pre-line break-keep"></p>
+            </div>
+
+            <!-- Replies -->
+            <div id="cardReplies" class="result-card rounded-[20px] p-4 bg-white border border-[#EDE6DC] flex flex-col gap-2.5">
+              <span class="text-[13px] font-bold text-[#78716C]">추천 답장</span>
+              <div id="replyList" class="flex flex-col gap-2"></div>
+            </div>
+
+            <!-- Warning -->
+            <div id="cardWarning" class="result-card rounded-[20px] p-4 bg-[#FEF5E7] border border-[#F5DFB8] flex flex-col gap-1">
+              <span class="text-[13px] font-bold text-[#B45309]">대화할 때 주의할 점</span>
+              <p id="warningTxt" class="text-[14px] text-[#1C1917] leading-relaxed break-keep"></p>
+            </div>
+
+            <!-- Actions -->
+            <div class="result-card flex flex-col gap-2 pt-1">
+              <button type="button" id="btnSaveImage" class="w-full h-12 rounded-xl bg-[#FF6452] text-white text-[15px] font-bold flex items-center justify-center gap-1.5 disabled:opacity-60">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <span id="btnSaveImageText">결과 이미지 저장</span>
+              </button>
+              <button type="button" id="btnNewScan" class="w-full h-12 rounded-xl bg-[#F5EFE6] text-[#57534E] text-[15px] font-bold">다른 대화 해독하기</button>
+            </div>
+          </section>
+
+          <!-- ================= HISTORY VIEW ================= -->
+          <section id="viewHistory" class="hidden flex-col gap-3">
+            <div class="rounded-[20px] p-4 bg-white border border-[#EDE6DC] flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <h2 class="font-jua text-[19px] text-[#1C1917]">분석 기록</h2>
+                <p class="text-[12px] text-[#78716C] mt-0.5 break-keep">이 기기에만 저장돼요 (최대 20개)</p>
+              </div>
+              <div id="clearHistoryArea" class="shrink-0 flex items-center gap-1"></div>
+            </div>
+            <div id="historyListContainer" class="flex flex-col gap-2"></div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Bottom CTA -->
+    <div id="bottomBar" class="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none">
+      <div class="w-full max-w-[430px] px-4 pt-2.5 bg-[#FAF7F2]/95 backdrop-blur border-t border-[#EDE6DC] pointer-events-auto" style="padding-bottom: calc(10px + env(safe-area-inset-bottom));">
+        <button type="button" id="btnStartAnalyze" disabled class="w-full h-12 rounded-xl text-[15px] font-bold px-3">
+          <span id="btnAnalyzeText" class="block truncate">대화 캡처를 올려주세요</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Image save fallback overlay -->
+    <div id="saveOverlay" class="fixed inset-0 z-[70] hidden flex-col items-center justify-center gap-3 bg-black/75 p-5">
+      <p class="text-white text-[15px] font-bold text-center break-keep">이미지를 길게 눌러 저장하세요</p>
+      <img id="saveOverlayImg" alt="TALK-CATCH 결과 이미지" class="max-w-full max-h-[72vh] rounded-xl shadow-2xl" />
+      <button type="button" id="btnCloseSaveOverlay" class="h-11 px-6 rounded-xl bg-white text-[14px] font-bold text-[#1C1917]">닫기</button>
+    </div>
+
+    <!-- API key modal -->
+    <div id="keyModal" class="fixed inset-0 z-[70] hidden items-center justify-center p-4 bg-black/30">
+      <div class="bg-white w-full max-w-[360px] rounded-[20px] p-5 border border-[#EDE6DC] flex flex-col gap-3.5">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-[15px] text-[#1C1917]">Gemini API 키 설정</span>
+          <button id="btnCloseKeyModal" type="button" aria-label="닫기" class="w-9 h-9 flex items-center justify-center text-[#78716C]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        </div>
+        <p class="text-[13px] text-[#78716C] leading-relaxed break-keep">AI Studio에서 실행할 때는 비워두면 됩니다. 이 파일을 내 컴퓨터에서 바로 열었거나 서버 없이 올렸다면, Google AI Studio에서 발급받은 Gemini API 키를 넣어주세요. 이 기기에만 저장돼요.</p>
+        <input type="password" id="apiKeyInput" placeholder="AIzaSy..." autocomplete="off" class="w-full h-12 text-[16px] font-mono px-3.5 rounded-xl bg-[#FAF7F2] border border-[#EDE6DC] focus:outline-none focus:border-[#FF6452]" />
+        <div class="flex gap-2">
+          <button id="btnSaveKey" type="button" class="flex-1 h-11 rounded-xl bg-[#FF6452] text-white font-bold text-[14px]">저장</button>
+          <button id="btnResetKey" type="button" class="h-11 px-4 rounded-xl bg-[#F5EFE6] text-[#57534E] font-semibold text-[14px]">초기화</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        'use strict';
+
+        // ---------------------------------------------------------------
+        // Constants
+        // ---------------------------------------------------------------
+        const IMG_BASE = 'https://raw.githubusercontent.com/aszxazs-a11y/image/main/';
+        const CAT_IMAGES = {
+          face: IMG_BASE + 'talkcatch-cat-face.png',
+          reading: IMG_BASE + 'talkcatch-cat-reading.png',
+          high: IMG_BASE + 'talkcatch-cat-front-high.png',
+          mid: IMG_BASE + 'talkcatch-cat-front-mid.png',
+          low: IMG_BASE + 'talkcatch-cat-front-low.png',
+        };
+        const HISTORY_KEY = 'talk_catch_history_v2';
+        const API_KEY_STORE = 'talk_decoder_apikey';
+        const MAX_HISTORY = 20;
+
+        const C = {
+          coral: '#FF6452', coralLight: '#FFF0EC', chip: '#F5EFE6', chipText: '#57534E',
+          ink: '#1C1917', sub: '#78716C', border: '#EDE6DC', cream: '#FAF7F2',
+        };
+        const CLS_SELECTED = 'bg-[#FF6452] text-white';
+        const CLS_UNSELECTED = 'bg-[#F5EFE6] text-[#57534E]';
+
+        // ---------------------------------------------------------------
+        // Safe helpers (a missing element never stops the whole app)
+        // ---------------------------------------------------------------
+        const $ = (id) => document.getElementById(id);
+        const on = (id, ev, fn) => { const el = $(id); if (el) el.addEventListener(ev, fn); };
+        const show = (el, display = 'flex') => { if (!el) return; el.classList.remove('hidden', 'flex', 'block'); el.classList.add(display); };
+        const hide = (el) => { if (!el) return; el.classList.remove('flex', 'block'); el.classList.add('hidden'); };
+        const setText = (id, text) => { const el = $(id); if (el) el.textContent = text == null ? '' : String(text); };
+        const storage = {
+          get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+          set(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } },
+          remove(k) { try { localStorage.removeItem(k); } catch (e) {} },
+        };
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+        // Preload cat images (with CORS, so canvas export stays clean)
+        const imageCache = {};
+        function loadImage(src) {
+          if (imageCache[src]) return imageCache[src];
+          imageCache[src] = new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = src;
+          });
+          return imageCache[src];
+        }
+        Object.values(CAT_IMAGES).forEach(loadImage);
+
+        // ---------------------------------------------------------------
+        // State
+        // ---------------------------------------------------------------
+        const state = {
+          mode: 'capture',
+          imageBase64: null,
+          fileData: null,
+          me: null,
+          partner: null,
+          relationship: null, // '애인·썸' | '직장' | '친구' | null
+          mbtiAxes: [null, null, null, null],
+          processing: false,
+          abort: null,
+          requestId: 0,
+          timers: [],
+          view: 'input', // input | loading | result | history
+          currentResult: null,
+          shareBlob: null,
+          shareBlobFor: null,
+          openedFromHistory: false,
+        };
+
+        // ---------------------------------------------------------------
+        // Relationship / level helpers
+        // ---------------------------------------------------------------
+        function relGroup(rel) {
+          if (!rel) return 'none';
+          if (/썸|애인|연애|소개팅/.test(rel)) return 'love';
+          if (/직장|동료|상사|업무/.test(rel)) return 'work';
+          return 'friend';
+        }
+        function indexTitle(group) {
+          return { love: '호감도', work: '협조도', friend: '친밀도' }[group] || '관계 온도';
+        }
+        function normalizeRel(rel) {
+          if (!rel) return null;
+          const g = relGroup(rel);
+          if (g === 'love') return '애인·썸';
+          if (g === 'work') return '직장';
+          if (/친구|지인/.test(rel)) return '친구';
+          if (/중고|거래|기타/.test(rel)) return '친구';
+          return null;
+        }
+        // One rule everywhere: high >= 70, mid 40~69, low < 40
+        function scoreLevel(score) {
+          const s = Number(score);
+          if (!isFinite(s)) return 'mid';
+          if (s >= 70) return 'high';
+          if (s >= 40) return 'mid';
+          return 'low';
+        }
+        function scoreBadgeText(score, title) {
+          const s = Number(score) || 0;
+          if (s >= 85) return `아주 높은 ${title}`;
+          if (s >= 70) return `높은 ${title}`;
+          if (s >= 55) return '무난한 사이';
+          if (s >= 40) return '애매한 거리감';
+          if (s >= 25) return '거리감 감지';
+          return '선긋기 신호';
+        }
+        const TIMING_LABEL = {
+          fast: '빠른 답장', moderate: '적당한 간격', slow: '느린 답장',
+          late_night: '늦은 밤 대화', mixed: '들쭉날쭉한 간격',
+        };
+
+        // ---------------------------------------------------------------
+        // Toast
+        // ---------------------------------------------------------------
+        let toastTimer = null;
+        function toast(msg) {
+          const el = $('toast');
+          if (!el) return;
+          setText('toastText', msg);
+          show(el);
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => hide(el), 2200);
+        }
+
+        // ---------------------------------------------------------------
+        // View switching
+        // ---------------------------------------------------------------
+        function setView(view) {
+          state.view = view;
+          const views = { input: $('viewInput'), loading: $('viewLoading'), result: $('viewResult'), history: $('viewHistory') };
+          Object.entries(views).forEach(([k, el]) => (k === view ? show(el) : hide(el)));
+          const bar = $('bottomBar');
+          if (bar) bar.style.display = view === 'input' ? '' : 'none';
+          const shell = $('appShell');
+          if (shell) shell.style.paddingBottom = view === 'input' ? 'calc(88px + env(safe-area-inset-bottom))' : 'calc(24px + env(safe-area-inset-bottom))';
+          const isHistory = view === 'history';
+          const tA = $('navTabAnalyze');
+          const tH = $('navTabHistory');
+          if (tA) tA.className = `h-8 px-3 rounded-lg text-[13px] ${!isHistory ? 'font-bold bg-[#FF6452] text-white' : 'font-semibold text-[#78716C]'}`;
+          if (tH) tH.className = `h-8 px-2.5 rounded-lg text-[13px] whitespace-nowrap ${isHistory ? 'font-bold bg-[#FF6452] text-white' : 'font-semibold text-[#78716C]'}`;
+          window.scrollTo({ top: 0, behavior: 'auto' });
+        }
+
+        // ---------------------------------------------------------------
+        // Kakao banner
+        // ---------------------------------------------------------------
+        (function kakaoBanner() {
+          const ua = (navigator.userAgent || '').toUpperCase();
+          let dismissed = false;
+          try { dismissed = sessionStorage.getItem('kakao_banner_dismissed') === '1'; } catch (e) {}
+          if (ua.includes('KAKAOTALK') && !dismissed) show($('kakaoBanner'));
+          on('btnCloseKakaoBanner', 'click', () => {
+            hide($('kakaoBanner'));
+            try { sessionStorage.setItem('kakao_banner_dismissed', '1'); } catch (e) {}
+          });
+        })();
+
+        // ---------------------------------------------------------------
+        // Mode (capture / file)
+        // ---------------------------------------------------------------
+        function setMode(mode) {
+          state.mode = mode;
+          hideError();
+          const sel = 'bg-[#FFF0EC] text-[#FF6452] border-[1.5px] border-[#FF6452]';
+          const unsel = 'bg-transparent text-[#57534E] border-[1.5px] border-transparent';
+          const base = 'mode-btn h-11 rounded-xl text-[14px] font-bold flex items-center justify-center gap-1.5 min-w-0 px-2 ';
+          if ($('btnModeCapture')) $('btnModeCapture').className = base + (mode === 'capture' ? sel : unsel);
+          if ($('btnModeFile')) $('btnModeFile').className = base + (mode === 'file' ? sel : unsel);
+          if (mode === 'capture') { show($('sectionCapture')); hide($('sectionFile')); }
+          else { show($('sectionFile')); hide($('sectionCapture')); }
+          updateCTA();
+        }
+        on('btnModeCapture', 'click', () => setMode('capture'));
+        on('btnModeFile', 'click', () => setMode('file'));
+        on('btnToggleGuide', 'click', () => {
+          const c = $('guideContent');
+          if (!c) return;
+          const open = c.classList.contains('hidden');
+          open ? show(c, 'block') : hide(c);
+          $('guideChevron')?.classList.toggle('rotate-180', open);
+        });
+
+        // ---------------------------------------------------------------
+        // Capture upload + compression
+        // ---------------------------------------------------------------
+        const captureInput = $('captureFileInput');
+        on('captureDropzone', 'click', () => captureInput && captureInput.click());
+        on('btnChangeCapture', 'click', () => captureInput && captureInput.click());
+        on('btnRemoveCapture', 'click', () => {
+          state.imageBase64 = null;
+          if (captureInput) captureInput.value = '';
+          hide($('capturePreviewBox'));
+          show($('captureDropzone'));
+          hide($('invalidChatBox'));
+          updateCTA();
+        });
+        if (captureInput) {
+          captureInput.addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (f) processImageFile(f);
+          });
+        }
+        const dz = $('captureDropzone');
+        if (dz) {
+          dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-[#FF6452]'); });
+          dz.addEventListener('dragleave', () => dz.classList.remove('border-[#FF6452]'));
+          dz.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dz.classList.remove('border-[#FF6452]');
+            const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (f) processImageFile(f);
+          });
+        }
+        window.addEventListener('paste', (e) => {
+          if (state.mode !== 'capture' || state.view !== 'input') return;
+          const items = (e.clipboardData && e.clipboardData.items) || [];
+          for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+              const f = items[i].getAsFile();
+              if (f) processImageFile(f);
+              break;
+            }
+          }
+        });
+
+        function processImageFile(file) {
+          hideError();
+          hide($('invalidChatBox'));
+          $('captureDropzone')?.classList.remove('border-red-400', 'animate-shake');
+          if (!file || !(file.type || '').startsWith('image/')) {
+            showError('이미지 파일(PNG, JPG)만 올릴 수 있어요.');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onerror = () => showError('사진을 읽지 못했어요. 다른 사진으로 시도해 주세요.');
+          reader.onload = (e) => {
+            const img = new Image();
+            img.onerror = () => showError('이 사진 형식은 읽을 수 없어요. 스크린샷(PNG, JPG)으로 올려주세요.');
+            img.onload = () => {
+              let sw = img.naturalWidth, sh = img.naturalHeight, sy = 0;
+              if (sh > 3000) { sy = sh - 3000; sh = 3000; }
+              const maxW = 1024;
+              const tw = Math.min(sw, maxW);
+              const th = Math.round((sh * tw) / sw);
+              const canvas = document.createElement('canvas');
+              canvas.width = tw; canvas.height = th;
+              const ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fillRect(0, 0, tw, th);
+              ctx.drawImage(img, 0, sy, sw, sh, 0, 0, tw, th);
+              state.imageBase64 = canvas.toDataURL('image/jpeg', 0.82);
+              const prev = $('capturePreviewImg');
+              if (prev) prev.src = state.imageBase64;
+              hide($('captureDropzone'));
+              show($('capturePreviewBox'), 'block');
+              updateCTA();
+            };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+
+        // ---------------------------------------------------------------
+        // Kakao .txt parsing
+        // ---------------------------------------------------------------
+        const txtInput = $('txtFileInput');
+        on('fileDropzone', 'click', () => txtInput && txtInput.click());
+        on('btnChangeFile', 'click', () => txtInput && txtInput.click());
+        if (txtInput) {
+          txtInput.addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (f) handleTextFile(f);
+            txtInput.value = '';
+          });
+        }
+
+        function fileNotice(msg) {
+          const box = $('fileNoticeBox');
+          if (!box) return;
+          if (msg) { box.textContent = msg; show(box, 'block'); } else { box.textContent = ''; hide(box); }
+        }
+
+        async function handleTextFile(file) {
+          fileNotice('');
+          if (/\.zip$/i.test(file.name)) { fileNotice('압축을 풀어서 .txt 파일을 올려주세요.'); return; }
+          try {
+            const buf = await file.arrayBuffer();
+            let text = new TextDecoder('utf-8').decode(buf);
+            if (text.split(String.fromCharCode(0xfffd)).length - 1 > 5) {
+              try { text = new TextDecoder('euc-kr').decode(buf); } catch (e) {}
+            }
+            if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+            parseKakao(text);
+          } catch (err) {
+            fileNotice('파일을 읽지 못했어요. 다시 시도해 주세요.');
+          }
+        }
+
+        function toDate(y, mo, d, ampm, h, mi) {
+          let hour = parseInt(h, 10);
+          if (ampm === '오후' && hour < 12) hour += 12;
+          if (ampm === '오전' && hour === 12) hour = 0;
+          const dt = new Date(+y, +mo - 1, +d, hour, +mi);
+          return isNaN(dt.getTime()) ? null : dt;
+        }
+
+        function parseKakao(raw) {
+          let lines = raw.split(/\r?\n/);
+          let capped = false;
+          if (lines.length > 50000) { lines = lines.slice(-50000); capped = true; }
+
+          const pcDate = /^-{3,}\s*(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일.*-{3,}\s*$/;
+          const pcMsg = /^\[(.+?)\]\s*\[(오전|오후)\s*(\d{1,2}):(\d{2})\]\s?(.*)$/;
+          const mob1 = /^(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*(오전|오후)\s*(\d{1,2}):(\d{2}),\s*(.+?)\s*:\s?(.*)$/;
+          const mob2 = /^(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s*(오전|오후)?\s*(\d{1,2}):(\d{2}),\s*(.+?)\s*:\s?(.*)$/;
+          const media = /^(사진|사진 \d+장|이모티콘|동영상|음성메시지|파일:.*|삭제된 메시지입니다\.?|샵검색:.*)$/;
+
+          const msgs = [];
+          let curDate = null;
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) continue;
+            let m = line.match(pcDate);
+            if (m) { curDate = [m[1], m[2], m[3]]; continue; }
+            let sender = null, content = '', ts = null;
+            if ((m = line.match(pcMsg))) {
+              sender = m[1].trim(); content = m[5];
+              if (curDate) ts = toDate(curDate[0], curDate[1], curDate[2], m[2], m[3], m[4]);
+            } else if ((m = line.match(mob1))) {
+              ts = toDate(m[1], m[2], m[3], m[4], m[5], m[6]); sender = m[7].trim(); content = m[8];
+            } else if ((m = line.match(mob2))) {
+              ts = toDate(m[1], m[2], m[3], m[4] || '', m[5], m[6]); sender = m[7].trim(); content = m[8];
+            } else {
+              if (msgs.length) msgs[msgs.length - 1].content += '\n' + line;
+              continue;
+            }
+            const c = (content || '').trim();
+            const isMedia = media.test(c);
+            msgs.push({ sender, content: isMedia ? '' : c, isMedia, ts });
+          }
+
+          if (!msgs.length) { fileNotice('카카오톡 대화 내보내기 파일 형식이 아니에요.'); return; }
+          const counts = {};
+          msgs.forEach((x) => { if (x.sender) counts[x.sender] = (counts[x.sender] || 0) + 1; });
+          const participants = Object.keys(counts).map((n) => ({ name: n, count: counts[n] })).sort((a, b) => b.count - a.count);
+          if (participants.length < 2) { fileNotice('두 명 이상 대화한 파일이어야 분석할 수 있어요.'); return; }
+
+          state.fileData = { messages: msgs, participants, capped };
+          state.me = null;
+          state.partner = null;
+          renderFilePreview();
+          updateCTA();
+        }
+
+        function participantChip(p, selected, onClick) {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = `h-11 max-w-full px-3 rounded-xl text-[14px] font-semibold flex items-center gap-1 min-w-0 ${selected ? CLS_SELECTED : CLS_UNSELECTED}`;
+          const n = document.createElement('span');
+          n.className = 'truncate max-w-[180px]';
+          n.textContent = p.name;
+          const c = document.createElement('span');
+          c.className = 'text-[12px] opacity-75 shrink-0';
+          c.textContent = `${p.count.toLocaleString()}`;
+          b.append(n, c);
+          b.addEventListener('click', onClick);
+          return b;
+        }
+
+        function renderFilePreview() {
+          const fd = state.fileData;
+          if (!fd) return;
+          hide($('fileDropzone'));
+          show($('filePreviewCard'));
+          const dated = fd.messages.filter((m) => m.ts);
+          const fmt = (d) => `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+          const period = dated.length ? `${fmt(dated[0].ts)} ~ ${fmt(dated[dated.length - 1].ts)}` : '기간 정보 없음';
+          setText('fileStatsSummary', `${period} · 메시지 ${fd.messages.length.toLocaleString()}개`);
+          setText('fileStatsSubtitle', `참여자 ${fd.participants.length}명${fd.capped ? ' · 최근 5만 줄만 분석' : ''}`);
+
+          const meBox = $('meParticipantChips');
+          if (meBox) {
+            meBox.innerHTML = '';
+            fd.participants.forEach((p) => {
+              meBox.appendChild(participantChip(p, state.me === p.name, () => {
+                state.me = state.me === p.name ? null : p.name;
+                state.partner = null;
+                const others = fd.participants.filter((x) => x.name !== state.me);
+                if (state.me && others.length === 1) state.partner = others[0].name;
+                renderFilePreview();
+                updateCTA();
+              }));
+            });
+          }
+          const others = fd.participants.filter((x) => x.name !== state.me);
+          const pc = $('partnerSelectContainer');
+          if (state.me && others.length >= 2) {
+            show(pc, 'block');
+            const box = $('partnerParticipantChips');
+            if (box) {
+              box.innerHTML = '';
+              others.forEach((p) => {
+                box.appendChild(participantChip(p, state.partner === p.name, () => {
+                  state.partner = state.partner === p.name ? null : p.name;
+                  renderFilePreview();
+                  updateCTA();
+                }));
+              });
+            }
+          } else {
+            hide(pc);
+          }
+        }
+
+        function computeStats(me, partner, messages) {
+          const rel = messages.filter((m) => m.sender === me || m.sender === partner);
+          const meMsgs = rel.filter((m) => m.sender === me && m.content);
+          const ptMsgs = rel.filter((m) => m.sender === partner && m.content);
+          let startMe = 0, startPt = 0, late = 0;
+          const repMe = [], repPt = [];
+          for (let i = 0; i < rel.length; i++) {
+            const cur = rel[i], prev = rel[i - 1];
+            if (cur.ts) { const h = cur.ts.getHours(); if (h >= 23 || h < 4) late++; }
+            if (prev && cur.ts && prev.ts) {
+              const diff = (cur.ts - prev.ts) / 60000;
+              if (diff >= 360) { cur.sender === me ? startMe++ : startPt++; }
+              else if (diff >= 0 && cur.sender !== prev.sender) { (cur.sender === me ? repMe : repPt).push(diff); }
+            }
+          }
+          const avg = (a) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : 0);
+          const st = startMe + startPt || 1;
+          const pc = ptMsgs.length || 1;
+          let len = 0, q = 0, laugh = 0;
+          ptMsgs.forEach((m) => { len += m.content.length; if (m.content.includes('?')) q++; if (/[ㅋㅎ]/.test(m.content)) laugh++; });
+          let trend = 'flat';
+          const dated = rel.filter((m) => m.ts);
+          if (dated.length > 30) {
+            const last = dated[dated.length - 1].ts.getTime();
+            const d30 = last - 30 * 864e5, d60 = last - 60 * 864e5;
+            const a = ptMsgs.filter((m) => m.ts && m.ts.getTime() >= d30).length;
+            const b = ptMsgs.filter((m) => m.ts && m.ts.getTime() >= d60 && m.ts.getTime() < d30).length;
+            if (b > 0) { const r = (a - b) / b; if (r > 0.15) trend = 'up'; else if (r < -0.15) trend = 'down'; }
+          }
+          return {
+            totalCount: rel.length,
+            meCount: meMsgs.length,
+            partnerCount: ptMsgs.length,
+            starterRatio: { me: Math.round((startMe / st) * 100), partner: 100 - Math.round((startMe / st) * 100) },
+            avgReplyMinutesMe: avg(repMe),
+            avgReplyMinutesPartner: avg(repPt),
+            partnerAvgLength: Math.round(len / pc),
+            partnerQuestionRatio: Math.round((q / pc) * 100),
+            partnerLaughRatio: Math.round((laugh / pc) * 100),
+            lateNightRatio: Math.round((late / (rel.length || 1)) * 100),
+            trend,
+          };
+        }
+
+        function anonymizedTranscript(me, partner, messages) {
+          const rel = messages.filter((m) => (m.sender === me || m.sender === partner) && m.content);
+          const slice = rel.slice(-400);
+          const lines = [];
+          let total = 0;
+          for (let i = slice.length - 1; i >= 0; i--) {
+            const m = slice[i];
+            const who = m.sender === me ? '나' : '상대';
+            let t = m.content
+              .replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '***@***')
+              .replace(/\d{2,3}[-\s.]?\d{3,4}[-\s.]?\d{4}/g, '***-****-****')
+              .replace(/\d{3,6}[-\s]\d{2,6}[-\s]\d{2,6}/g, '***-***-***');
+            [me, partner].forEach((name) => { if (name && name.length > 1) t = t.split(name).join(name === me ? '나' : '상대'); });
+            const time = m.ts ? `${m.ts.getMonth() + 1}/${m.ts.getDate()} ${m.ts.getHours()}:${String(m.ts.getMinutes()).padStart(2, '0')}` : '';
+            const line = `[${time}] ${who}: ${t}`;
+            if (total + line.length > 20000) break;
+            lines.unshift(line);
+            total += line.length + 1;
+          }
+          return lines.join('\n');
+        }
+
+        // ---------------------------------------------------------------
+        // Relationship chips (tap again to deselect)
+        // ---------------------------------------------------------------
+        function renderRelChips() {
+          document.querySelectorAll('.rel-chip').forEach((chip) => {
+            const sel = chip.getAttribute('data-rel') === state.relationship;
+            chip.className = `rel-chip h-11 rounded-xl text-[14px] min-w-0 px-1 truncate ${sel ? CLS_SELECTED + ' font-bold' : CLS_UNSELECTED + ' font-semibold'}`;
+            chip.setAttribute('aria-pressed', sel ? 'true' : 'false');
+          });
+          setText('selectedRelBadge', state.relationship || '선택 안 함');
+          const badge = $('selectedRelBadge');
+          if (badge) badge.style.color = state.relationship ? C.coral : C.sub;
+        }
+        document.querySelectorAll('.rel-chip').forEach((chip) => {
+          chip.addEventListener('click', () => {
+            const rel = chip.getAttribute('data-rel');
+            state.relationship = state.relationship === rel ? null : rel;
+            renderRelChips();
+          });
+        });
+
+        // ---------------------------------------------------------------
+        // MBTI (tap again to deselect, '모름' clears all)
+        // ---------------------------------------------------------------
+        function mbtiCount() { return state.mbtiAxes.filter(Boolean).length; }
+        function renderMbti() {
+          const count = mbtiCount();
+          const unknown = count === 0;
+          document.querySelectorAll('.mbti-btn').forEach((btn) => {
+            const axis = +btn.getAttribute('data-axis');
+            const letter = btn.getAttribute('data-letter');
+            const sel = state.mbtiAxes[axis] === letter;
+            btn.className = `mbti-btn h-11 rounded-xl flex flex-col items-center justify-center leading-none ${sel ? CLS_SELECTED : CLS_UNSELECTED}`;
+            btn.setAttribute('aria-pressed', sel ? 'true' : 'false');
+          });
+          const grid = $('mbtiGrid');
+          if (grid) grid.style.opacity = unknown ? '0.55' : '1';
+          const u = $('btnMbtiUnknown');
+          if (u) u.className = `h-8 px-3 rounded-full text-[13px] font-bold shrink-0 border-[1.5px] ${unknown ? 'bg-[#FFF0EC] text-[#FF6452] border-[#FF6452]' : 'bg-[#F5EFE6] text-[#57534E] border-transparent'}`;
+          const help = $('mbtiHelpText');
+          if (help) {
+            if (count === 0) { help.textContent = '모르면 비워두세요. 누른 글자를 다시 누르면 선택이 풀려요.'; help.style.color = C.sub; }
+            else if (count < 4) { help.textContent = `${state.mbtiAxes.map((x) => x || '_').join('')} · ${4 - count}개 더 고르거나 '모름'을 눌러주세요`; help.style.color = '#B45309'; }
+            else { help.textContent = `${state.mbtiAxes.join('')} 성향을 참고해서 답장 말투를 맞춰요`; help.style.color = C.sub; }
+          }
+          updateCTA();
+        }
+        document.querySelectorAll('.mbti-btn').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const axis = +btn.getAttribute('data-axis');
+            const letter = btn.getAttribute('data-letter');
+            state.mbtiAxes[axis] = state.mbtiAxes[axis] === letter ? null : letter;
+            renderMbti();
+          });
+        });
+        on('btnMbtiUnknown', 'click', () => { state.mbtiAxes = [null, null, null, null]; renderMbti(); });
+
+        // ---------------------------------------------------------------
+        // Bottom CTA
+        // ---------------------------------------------------------------
+        function updateCTA() {
+          const btn = $('btnStartAnalyze');
+          if (!btn) return;
+          let msg = null;
+          if (state.processing) msg = '해독하는 중...';
+          else if (state.mode === 'capture' && !state.imageBase64) msg = '대화 캡처를 올려주세요';
+          else if (state.mode === 'file' && !state.fileData) msg = '카톡 대화(.txt) 파일을 올려주세요';
+          else if (state.mode === 'file' && !state.me) msg = "'나는 누구인가요?'를 골라주세요";
+          else if (state.mode === 'file' && !state.partner) msg = '분석할 상대를 골라주세요';
+          else if (mbtiCount() > 0 && mbtiCount() < 4) msg = "MBTI를 마저 고르거나 '모름'을 눌러주세요";
+          const ready = !msg;
+          btn.disabled = !ready;
+          btn.className = `w-full h-12 rounded-xl text-[15px] font-bold px-3 ${ready ? 'bg-[#FF6452] text-white active:scale-[0.98]' : 'bg-[#F5EFE6] text-[#78716C]'}`;
+          setText('btnAnalyzeText', msg || (state.mode === 'capture' ? '속마음 해독하기' : '심층 해독하기'));
+        }
+
+        // ---------------------------------------------------------------
+        // Errors
+        // ---------------------------------------------------------------
+        function showError(msg, code) {
+          setText('generalErrorMsg', msg);
+          const codeEl = $('generalErrorCode');
+          if (codeEl) { if (code) { codeEl.textContent = `원인 코드: ${code}`; show(codeEl, 'block'); } else hide(codeEl); }
+          const box = $('generalErrorBox');
+          show(box);
+          if (box) box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        function hideError() { hide($('generalErrorBox')); }
+
+        // ---------------------------------------------------------------
+        // Analysis
+        // ---------------------------------------------------------------
+        function clearTimers() { state.timers.forEach((t) => { clearTimeout(t); clearInterval(t); }); state.timers = []; }
+
+        function startLoadingUI() {
+          const steps = state.mode === 'capture'
+            ? ['말풍선 읽는 중', '누가 한 말인지 정리하는 중', '말투와 답장 텀 살펴보는 중', '속마음 정리하는 중']
+            : ['대화 흐름 정리하는 중', '자주 쓰는 말투 찾는 중', '최근 변화 비교하는 중', '지금 상태 정리하는 중'];
+          const bars = Array.from(document.querySelectorAll('.prog-bar'));
+          bars.forEach((b, i) => (b.style.background = i === 0 ? C.coral : C.chip));
+          setText('loadingStepText', steps[0]);
+          hide($('loadingLongWaitNotice'));
+          hide($('btnCancelAnalysis'));
+          if (state.mode === 'file' && state.fileData) {
+            setText('loadingFileStatsTitle', `메시지 ${state.fileData.messages.length.toLocaleString()}개 정리 완료`);
+            setText('loadingFileStatsDetail', '이름은 지우고 대화 흐름만 분석해요');
+            show($('loadingFileStatsBox'));
+          } else hide($('loadingFileStatsBox'));
+          let i = 0;
+          const iv = setInterval(() => {
+            if (i >= 2) { setText('loadingStepText', steps[3]); clearInterval(iv); return; }
+            i++;
+            setText('loadingStepText', steps[i]);
+            if (bars[i]) bars[i].style.background = C.coral;
+          }, 1500);
+          state.timers.push(iv);
+          state.timers.push(setTimeout(() => show($('loadingLongWaitNotice'), 'block'), 6000));
+          state.timers.push(setTimeout(() => show($('btnCancelAnalysis'), 'block'), 12000));
+          setView('loading');
+        }
+
+
+        // ---------------------------------------------------------------
+        // Analysis request: server first, browser-direct Gemini as fallback
+        // (fallback is used when the page is opened as a file or no server answers)
+        // ---------------------------------------------------------------
+        function noServerError() {
+          const e = new Error('분석 서버에 연결하지 못했어요. 파일을 내 컴퓨터에서 바로 열었다면, 오른쪽 위 열쇠 버튼에 Gemini API 키를 넣고 다시 눌러주세요.');
+          e.code = 'NO_SERVER';
+          return e;
+        }
+
+        async function requestAnalysis(body, signal) {
+          const userKey = storage.get(API_KEY_STORE) || '';
+          if (location.protocol === 'file:') {
+            if (!userKey) { show($('keyModal')); throw noServerError(); }
+            return callGeminiDirect(body, userKey, signal);
+          }
+          let res;
+          try {
+            res = await fetch('/api/analyze', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+              signal,
+            });
+          } catch (netErr) {
+            if (netErr && netErr.name === 'AbortError') throw netErr;
+            if (userKey) return callGeminiDirect(body, userKey, signal);
+            show($('keyModal'));
+            throw noServerError();
+          }
+          let data = null;
+          try { data = await res.json(); } catch (e) { data = null; }
+          // Static hosting (no server.ts): 404/405 or an HTML page instead of JSON
+          if ((res.status === 404 || res.status === 405 || !data) && !res.ok) {
+            if (userKey) return callGeminiDirect(body, userKey, signal);
+            show($('keyModal'));
+            throw noServerError();
+          }
+          if (!res.ok || !data) {
+            const err = new Error((data && data.error) || '분석 서버에서 응답을 받지 못했어요. 잠시 후 다시 시도해 주세요.');
+            err.code = ((data && data.errorCode) || `HTTP_${res.status}`) + (data && data.detail ? ` / ${String(data.detail).slice(0, 160)}` : '');
+            throw err;
+          }
+          return data;
+        }
+
+        const SPEEDS = ['fast', 'moderate', 'slow', 'late_night', 'mixed', 'unknown'];
+        const DIRECT_MODELS = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-flash-lite-latest'];
+        const DIRECT_SCHEMA = {
+          type: 'OBJECT',
+          properties: {
+            is_valid_chat: { type: 'BOOLEAN' },
+            invalid_reason: { type: 'STRING' },
+            chat_type: { type: 'STRING', enum: ['meaningful', 'everyday_routine'] },
+            timing_insight: {
+              type: 'OBJECT',
+              properties: {
+                available: { type: 'BOOLEAN' },
+                reply_speed: { type: 'STRING', enum: SPEEDS },
+                analysis: { type: 'STRING' },
+              },
+              required: ['available', 'reply_speed', 'analysis'],
+            },
+            temperature: { type: 'INTEGER' },
+            confidence: { type: 'STRING', enum: ['low', 'medium', 'high'] },
+            summary: { type: 'STRING' },
+            subtext: { type: 'STRING' },
+            status_tags: { type: 'ARRAY', items: { type: 'STRING' } },
+            replies: {
+              type: 'OBJECT',
+              properties: { charm: { type: 'STRING' }, polite: { type: 'STRING' }, cut: { type: 'STRING' } },
+              required: ['charm', 'polite', 'cut'],
+            },
+            warning: { type: 'STRING' },
+          },
+          required: ['is_valid_chat', 'invalid_reason', 'chat_type', 'timing_insight', 'temperature', 'confidence', 'summary', 'subtext', 'status_tags', 'replies', 'warning'],
+          propertyOrdering: ['is_valid_chat', 'invalid_reason', 'chat_type', 'timing_insight', 'temperature', 'confidence', 'summary', 'subtext', 'status_tags', 'replies', 'warning'],
+        };
+
+        const COMMON_RULES = `
+[공통 규칙]
+- 보이는(주어진) 대화만 근거로 판단하고, 없는 사정이나 이전 대화를 지어내지 말 것.
+- "~일 수 있어요", "~해 보여요"처럼 말하고 단정하지 말 것.
+- 금지: 관계를 끝내라/고백해라/차단해라 같은 큰 결정 지시, 밀당·질투 유발·일부러 무시하기 같은 조종 전략, 상대 성격을 단정하거나 깎아내리는 표현.
+- 친구 사이에서 웃음과 함께 오가는 거친 말은 장난일 가능성을 먼저 고려할 것.
+- 모든 텍스트에 이모지 금지. 해시태그(status_tags)에는 # 기호 없이 단어만.
+- MBTI는 답장 말투를 맞추는 데만 참고하고 속마음 판단 근거로 쓰지 말 것.
+
+[점수 기준 temperature 0~100]
+- 85~100: 먼저 질문·약속 제안, 즉각 답장, 긴 리액션, 적극적 관심
+- 70~84: 부드러운 말투, 긍정적 맞장구, 비교적 빠른 답장
+- 50~69: 예의 바른 단문, 질문은 적지만 친절함 유지
+- 35~49: 단답 위주, 질문 없음, 늦은 답장, 대화를 마무리하려는 뉘앙스
+- 0~34: 차가운 단답, 핑계나 거절, 형식적인 답장
+- 같은 대화에는 항상 같은 기준으로 같은 점수를 줄 것.
+
+[출력 항목]
+- chat_type: 'everyday_routine'(안부·밥·날씨·단순 정보만 있고 특별한 뉘앙스가 없음) 또는 'meaningful'
+- summary: 한 줄 결론, 35자 이내
+- subtext: 상대 속마음 해석 2~3문장, 150자 이내
+- status_tags: 상대 상태를 요약하는 단어 2~4개
+- replies: 바로 보낼 수 있는 자연스러운 카톡 말투, 각 45자 이내
+  * charm: 부담 없이 다정한 답장(과한 플러팅·고백 금지)
+  * polite: 누구에게나 무난한 답장
+  * cut: 정중하게 대화를 마무리하는 답장(차갑거나 공격적인 표현 금지)
+- warning: 이 상황에서 조심할 점 한 줄, 60자 이내
+- confidence: 상대 메시지가 3개 이하이거나 맥락이 애매하면 'low'
+`;
+        const relLine = (r) => (r ? `- 사용자가 선택한 관계: ${r}` : '- 관계: 사용자가 선택하지 않음. 대화 내용으로 관계를 조심스럽게 짐작할 것.');
+        const mbtiLineTxt = (m) => (m ? `- 상대 MBTI(사용자 입력): ${m}` : '- 상대 MBTI: 모름');
+
+        function directCapturePrompt(rel, mbti) {
+          return `너는 한국어 메신저 대화를 읽고 상대의 속마음과 답장 타이밍을 해석하는 관계 코치야.
+첨부 이미지를 보고 아래 순서대로 판단해서 지정된 JSON으로만 답해.
+
+[1. 이미지 판별]
+- 카카오톡, 인스타 DM, 문자 등 메신저 대화 캡처가 아니거나 글자를 읽을 수 없으면:
+  is_valid_chat=false, invalid_reason에 이유 한 줄, 나머지는 빈 값이나 기본값.
+
+[2. 화자 구분]
+- 오른쪽 말풍선은 '나', 왼쪽 말풍선(프로필 사진이나 이름이 붙은 쪽)은 '상대'.
+- 상대의 각 메시지는 바로 앞 내 메시지에 대한 반응으로 해석(답했는지, 화제를 이었는지, 바꿨는지, 질문했는지).
+- 앞부분과 끝부분의 말투 온도 변화(존댓말↔반말, 웃음·이모티콘 감소, 마침표 단답)를 비교.
+
+[3. 답장 텀 분석 timing_insight]
+- 말풍선 옆에 찍힌 시각, 날짜 구분선, '읽음 1' 표시를 읽고 메시지 사이 시간 간격을 계산해.
+- 시각이 보이면 available=true, reply_speed는 fast(대부분 몇 분 안) / moderate(수십 분~1시간) / slow(몇 시간 이상) / late_night(밤 11시~새벽 4시 대화 위주) / mixed(들쭉날쭉) 중 하나,
+  analysis에는 상대의 답장 간격과 시간대가 무엇을 뜻하는지 1~2문장(90자 이내). 실제 시각을 근거로 쓸 것.
+- 시각이 하나도 보이지 않으면 available=false, reply_speed='unknown', analysis=''. 절대 시간을 지어내지 말 것.
+
+[4. 사용자 정보]
+${relLine(rel)}
+${mbtiLineTxt(mbti)}
+${COMMON_RULES}`;
+        }
+
+        function directFilePrompt(rel, mbti, s, transcript) {
+          s = s || {};
+          const sr = s.starterRatio || {};
+          return `너는 한국어 카카오톡 대화를 읽고 상대의 속마음과 관계 흐름을 해석하는 관계 코치야.
+브라우저에서 이름을 지우고 계산한 통계와 최근 대화를 보고 지정된 JSON으로만 답해. is_valid_chat은 true.
+
+[대화 통계 - 코드로 정확히 계산된 값이니 다시 계산하지 말고 근거로 인용만 할 것]
+- 메시지 수: 나 ${s.meCount || 0}개 / 상대 ${s.partnerCount || 0}개
+- 6시간 이상 공백 뒤 먼저 말 건 비율: 나 ${sr.me ?? 50}% / 상대 ${sr.partner ?? 50}%
+- 평균 답장 시간: 나 ${s.avgReplyMinutesMe || 0}분 / 상대 ${s.avgReplyMinutesPartner || 0}분
+- 상대 메시지: 평균 ${s.partnerAvgLength || 0}자, 질문 비율 ${s.partnerQuestionRatio || 0}%, 웃음(ㅋ/ㅎ) 비율 ${s.partnerLaughRatio || 0}%
+- 밤 11시~새벽 4시 대화 비율: ${s.lateNightRatio || 0}%
+- 최근 30일 상대 메시지 추세: ${s.trend || 'flat'} (up=증가, down=감소, flat=비슷)
+
+[답장 텀 분석 timing_insight]
+- 위 평균 답장 시간과 밤 대화 비율을 근거로 available=true, reply_speed(fast/moderate/slow/late_night/mixed)를 정하고,
+  analysis에 상대의 답장 간격이 무엇을 뜻하는지 1~2문장(90자 이내). 나와 상대의 답장 시간을 비교해 줄 것.
+
+[사용자 정보]
+${relLine(rel)}
+${mbtiLineTxt(mbti)}
+
+[최근 대화 (이름은 '나', '상대'로 바뀜)]
+${transcript}
+${COMMON_RULES}`;
+        }
+
+        const txt = (v, fb = '') => (typeof v === 'string' && v.trim() ? v.trim() : fb);
+        function sanitizeResult(raw) {
+          let clean = String(raw || '').trim().replace(/```(?:json)?/gi, '').trim();
+          const a = clean.indexOf('{'), b = clean.lastIndexOf('}');
+          if (a !== -1 && b > a) clean = clean.slice(a, b + 1);
+          let d;
+          try { d = JSON.parse(clean); } catch (e) { const er = new Error('AI 답변을 정리하지 못했어요. 다시 시도해 주세요.'); er.code = 'PARSE_FAIL'; throw er; }
+          d.is_valid_chat = d.is_valid_chat !== false;
+          d.invalid_reason = txt(d.invalid_reason, d.is_valid_chat ? '' : '대화 캡처가 아니거나 글자를 읽을 수 없어요. 말풍선이 잘 보이는 캡처를 올려주세요.');
+          d.chat_type = d.chat_type === 'everyday_routine' ? 'everyday_routine' : 'meaningful';
+          d.confidence = ['low', 'medium', 'high'].includes(d.confidence) ? d.confidence : 'medium';
+          const t = Number(d.temperature);
+          d.temperature = isFinite(t) ? Math.max(0, Math.min(100, Math.round(t))) : 50;
+          d.status_tags = (Array.isArray(d.status_tags) ? d.status_tags : []).map((x) => String(x || '').replace(/^[#\s]+/, '').trim()).filter(Boolean).slice(0, 4);
+          d.summary = txt(d.summary, '대화의 흐름을 바탕으로 정리한 결과예요.');
+          d.subtext = txt(d.subtext, '대화의 맥락과 말투를 바탕으로 해석한 결과예요.');
+          const ti = d.timing_insight && typeof d.timing_insight === 'object' ? d.timing_insight : {};
+          const sp = SPEEDS.includes(ti.reply_speed) ? ti.reply_speed : 'unknown';
+          const an = txt(ti.analysis);
+          d.timing_insight = { available: ti.available === true && sp !== 'unknown' && !!an, reply_speed: sp, analysis: an };
+          const r = d.replies && typeof d.replies === 'object' ? d.replies : {};
+          d.replies = {
+            charm: txt(r.charm, '오 그렇구나! 얘기해줘서 고마워 :)'),
+            polite: txt(r.polite, '알려줘서 고마워요. 편할 때 또 이야기해요.'),
+            cut: txt(r.cut, '확인했어요! 좋은 하루 보내세요.'),
+          };
+          d.warning = txt(d.warning, '상대의 답장 속도에 맞춰 너무 몰아붙이지 않는 게 좋아요.');
+          return d;
+        }
+
+        function directErrorCode(status, message) {
+          const m = String(message || '');
+          if (status === 400 && /API key|API_KEY/i.test(m)) return 'API_KEY_INVALID';
+          if (status === 401 || status === 403) return 'API_KEY_INVALID';
+          if (status === 429) return 'RATE_LIMIT';
+          if (status === 404) return 'MODEL_NOT_FOUND';
+          if (status === 503 || status === 500) return 'MODEL_BUSY';
+          return `HTTP_${status}`;
+        }
+        const DIRECT_MESSAGES = {
+          API_KEY_INVALID: 'Gemini API 키가 올바르지 않아요. 열쇠 버튼에서 키를 다시 확인해 주세요.',
+          RATE_LIMIT: '잠깐 사이에 요청이 많았어요. 1분 정도 뒤에 다시 시도해 주세요.',
+          MODEL_BUSY: '지금 AI 서버가 붐벼요. 잠시 후 다시 시도해 주세요.',
+          TIMEOUT: 'AI 응답이 늦어지고 있어요. 잠시 후 다시 시도해 주세요.',
+        };
+
+        async function callGeminiDirect(body, key, outerSignal) {
+          const parts = [];
+          if (body.mode === 'file') {
+            parts.push({ text: directFilePrompt(body.relationship, body.mbti, body.stats, String(body.transcript || '').slice(0, 22000)) });
+          } else {
+            const src = String(body.imageBase64 || '');
+            const m = src.match(/^data:(.*?);base64,(.*)$/);
+            parts.push({ inlineData: { mimeType: m ? m[1] : 'image/jpeg', data: m ? m[2] : src } });
+            parts.push({ text: directCapturePrompt(body.relationship, body.mbti) });
+          }
+          let lastCode = 'MODEL_ERROR';
+          for (let i = 0; i < DIRECT_MODELS.length; i++) {
+            const model = DIRECT_MODELS[i];
+            const generationConfig = { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: 'application/json', responseSchema: DIRECT_SCHEMA };
+            if (model.startsWith('gemini-2.5')) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+            const ctrl = new AbortController();
+            const onOuter = () => ctrl.abort();
+            if (outerSignal) { if (outerSignal.aborted) ctrl.abort(); else outerSignal.addEventListener('abort', onOuter); }
+            const timer = setTimeout(() => ctrl.abort(), 25000);
+            try {
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+                body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig }),
+                signal: ctrl.signal,
+              });
+              const json = await res.json().catch(() => null);
+              if (!res.ok) {
+                lastCode = directErrorCode(res.status, json && json.error && json.error.message);
+                if (lastCode === 'API_KEY_INVALID') break;
+                throw new Error(lastCode);
+              }
+              const textOut = json && json.candidates && json.candidates[0] && json.candidates[0].content && (json.candidates[0].content.parts || []).map((p) => p.text || '').join('');
+              if (!textOut) { lastCode = 'MODEL_ERROR'; throw new Error(lastCode); }
+              try { return sanitizeResult(textOut); } catch (pe) { lastCode = 'PARSE_FAIL'; throw pe; }
+            } catch (err) {
+              if (outerSignal && outerSignal.aborted) throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+              if (err && err.name === 'AbortError') lastCode = 'TIMEOUT';
+              else if (err instanceof TypeError) lastCode = 'NETWORK';
+              if (i < DIRECT_MODELS.length - 1) await sleep(lastCode === 'RATE_LIMIT' ? 2000 : 600);
+            } finally {
+              clearTimeout(timer);
+              if (outerSignal) outerSignal.removeEventListener('abort', onOuter);
+            }
+          }
+          const e = new Error(DIRECT_MESSAGES[lastCode] || (lastCode === 'NETWORK' ? '인터넷 연결을 확인하고 다시 시도해 주세요.' : '분석 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.'));
+          e.code = lastCode;
+          throw e;
+        }
+
+        async function startAnalysis() {
+          if (state.processing) return;
+          hideError();
+          hide($('invalidChatBox'));
+          state.processing = true;
+          updateCTA();
+          const reqId = ++state.requestId;
+          const controller = new AbortController();
+          state.abort = controller;
+          startLoadingUI();
+
+          const frontTimeout = setTimeout(() => controller.abort('timeout'), 60000);
+          const mbti = mbtiCount() === 4 ? state.mbtiAxes.join('') : '';
+          const body = {
+            mode: state.mode,
+            relationship: state.relationship || '',
+            mbti,
+            customApiKey: storage.get(API_KEY_STORE) || undefined,
+          };
+          let fileStats = null;
+          if (state.mode === 'capture') {
+            body.imageBase64 = state.imageBase64;
+          } else {
+            fileStats = computeStats(state.me, state.partner, state.fileData.messages);
+            body.stats = fileStats;
+            body.transcript = anonymizedTranscript(state.me, state.partner, state.fileData.messages);
+          }
+
+          try {
+            const data = await requestAnalysis(body, controller.signal);
+            if (reqId !== state.requestId) return;
+            document.querySelectorAll('.prog-bar').forEach((b) => (b.style.background = C.coral));
+            await sleep(250);
+            if (reqId !== state.requestId) return;
+            finishLoading();
+
+            if (data.is_valid_chat === false) {
+              setView('input');
+              if (state.mode === 'capture') {
+                setText('invalidReasonTxt', data.invalid_reason || '말풍선이 잘 보이는 카톡·DM 캡처를 올려주세요.');
+                show($('invalidChatBox'));
+                const z = $('capturePreviewBox');
+                if (z) { z.classList.remove('animate-shake'); void z.offsetWidth; z.classList.add('animate-shake'); z.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+              } else {
+                showError(data.invalid_reason || '대화 내용을 분석할 수 없었어요.');
+              }
+              return;
+            }
+            const result = Object.assign({}, data, {
+              relationship: state.relationship,
+              mbti,
+              mode: state.mode,
+              stats: fileStats,
+              createdAt: Date.now(),
+            });
+            state.openedFromHistory = false;
+            renderResult(result);
+            saveHistory(result);
+          } catch (err) {
+            if (reqId !== state.requestId) return;
+            finishLoading();
+            setView('input');
+            if (err && err.name === 'AbortError') {
+              if (controller.signal.reason === 'timeout') showError('응답이 너무 오래 걸려요. 잠시 후 다시 시도해 주세요.', 'TIMEOUT');
+              return;
+            }
+            const isNet = err instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(err && err.message));
+            showError(isNet ? '인터넷 연결이나 서버 상태를 확인하고 다시 시도해 주세요.' : ((err && err.message) || '분석 중 문제가 생겼어요. 다시 시도해 주세요.'), (err && err.code) || 'NETWORK');
+          } finally {
+            clearTimeout(frontTimeout);
+          }
+        }
+
+        function finishLoading() {
+          clearTimers();
+          state.processing = false;
+          state.abort = null;
+          updateCTA();
+        }
+
+        on('btnStartAnalyze', 'click', startAnalysis);
+        on('btnCancelAnalysis', 'click', () => {
+          state.requestId++;
+          if (state.abort) state.abort.abort('cancel');
+          finishLoading();
+          setView('input');
+          toast('분석을 취소했어요');
+        });
+
+        // ---------------------------------------------------------------
+        // Result rendering
+        // ---------------------------------------------------------------
+        function fmtMinutes(min) {
+          const m = Number(min) || 0;
+          if (m < 60) return `${m}분`;
+          const h = Math.floor(m / 60);
+          return m % 60 ? `${h}시간 ${m % 60}분` : `${h}시간`;
+        }
+        function fmtDate(ts) {
+          const d = new Date(ts || Date.now());
+          return `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+
+        function replyRow(label, text) {
+          const wrap = document.createElement('div');
+          wrap.className = 'rounded-xl bg-[#FAF7F2] border border-[#EDE6DC] p-3 flex flex-col gap-1.5';
+          const top = document.createElement('div');
+          top.className = 'flex items-center justify-between gap-2';
+          const l = document.createElement('span');
+          l.className = 'text-[13px] font-bold text-[#1C1917]';
+          l.textContent = label;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'h-9 px-3 shrink-0 rounded-lg bg-[#F5EFE6] text-[13px] font-semibold text-[#57534E]';
+          b.textContent = '복사';
+          const p = document.createElement('p');
+          p.className = 'text-[14px] text-[#1C1917] leading-relaxed break-keep';
+          p.textContent = text;
+          b.addEventListener('click', () => copyText(text, b));
+          top.append(l, b);
+          wrap.append(top, p);
+          return wrap;
+        }
+
+        async function copyText(text, btn) {
+          let ok = false;
+          try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+            try {
+              const ta = document.createElement('textarea');
+              ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+              document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove();
+            } catch (e2) {}
+          }
+          if (ok) {
+            if (btn) { btn.textContent = '복사됨'; setTimeout(() => (btn.textContent = '복사'), 1500); }
+            toast('답장을 복사했어요');
+          } else toast('복사가 안 돼요. 글자를 길게 눌러 복사해 주세요');
+        }
+
+        function renderResult(r) {
+          state.currentResult = r;
+          state.shareBlob = null;
+          state.shareBlobFor = null;
+
+          const group = relGroup(r.relationship);
+          const title = indexTitle(group);
+          const isEveryday = r.chat_type === 'everyday_routine';
+          const score = Math.max(0, Math.min(100, Math.round(Number(r.temperature) || 0)));
+          const level = scoreLevel(score);
+
+          // History back bar
+          const backBar = $('historyBackBar');
+          if (state.openedFromHistory) { show(backBar); setText('historyBackDate', `${fmtDate(r.createdAt)} 분석`); } else hide(backBar);
+
+          setText('reportMeta', [r.relationship || '관계 미선택', r.mbti || null, fmtDate(r.createdAt)].filter(Boolean).join(' · '));
+
+          // Score vs everyday
+          if (isEveryday) {
+            hide($('cardScore'));
+            show($('cardEveryday'));
+            const ei = $('everydayCatImg');
+            if (ei) ei.src = CAT_IMAGES.mid;
+            setText('everydaySummary', r.summary || '');
+          } else {
+            hide($('cardEveryday'));
+            show($('cardScore'));
+            setText('scoreTitle', title);
+            setText('scoreBadge', scoreBadgeText(score, title));
+            setText('summaryLine', r.summary || '');
+            const conf = $('confidenceLowNote');
+            r.confidence === 'low' ? show(conf, 'block') : hide(conf);
+            runScoreAnimation(score, level);
+          }
+
+          // Tags
+          const tagBox = $('statusTagsContainer');
+          if (tagBox) {
+            tagBox.innerHTML = '';
+            (r.status_tags || []).slice(0, 4).forEach((t) => {
+              const s = String(t || '').replace(/^[#\s]+/, '').trim();
+              if (!s) return;
+              const el = document.createElement('span');
+              el.className = 'text-[12px] font-semibold px-2.5 py-1 rounded-full bg-[#F5EFE6] text-[#57534E] break-keep';
+              el.textContent = `#${s}`;
+              tagBox.appendChild(el);
+            });
+          }
+
+          // Timing
+          const t = r.timing_insight || {};
+          if (t.available && (t.analysis || '').trim()) {
+            setText('timingBadge', TIMING_LABEL[t.reply_speed] || '답장 패턴');
+            setText('timingText', t.analysis);
+            show($('cardTiming'));
+          } else hide($('cardTiming'));
+
+          // File stats
+          const st = r.stats;
+          if (st && st.starterRatio) {
+            setText('statStarter', `나 ${st.starterRatio.me}% · 상대 ${st.starterRatio.partner}%`);
+            setText('statReply', `나 ${fmtMinutes(st.avgReplyMinutesMe)} · 상대 ${fmtMinutes(st.avgReplyMinutesPartner)}`);
+            setText('statQuestion', `${st.partnerQuestionRatio}%`);
+            setText('statTrend', st.trend === 'up' ? '대화가 늘었어요' : st.trend === 'down' ? '대화가 줄었어요' : '비슷해요');
+            show($('cardFileStats'));
+          } else hide($('cardFileStats'));
+
+          // Subtext / replies / warning
+          setText('subtextValue', r.subtext || '');
+          const list = $('replyList');
+          if (list) {
+            list.innerHTML = '';
+            const rp = r.replies || {};
+            const rows = isEveryday
+              ? [['센스 있는 답장', rp.charm], ['무난한 답장', rp.polite]]
+              : [['다정하게', rp.charm], ['무난하게', rp.polite], ['정중하게 마무리', rp.cut]];
+            rows.forEach(([label, text]) => { if (text && String(text).trim()) list.appendChild(replyRow(label, String(text).trim())); });
+          }
+          if (r.warning && !isEveryday) { setText('warningTxt', r.warning); show($('cardWarning')); } else hide($('cardWarning'));
+
+          setView('result');
+
+          // Staggered fade-in (class removed after it ends, so nothing stays invisible)
+          const cards = Array.from(document.querySelectorAll('#viewResult .result-card')).filter((c) => !c.classList.contains('hidden'));
+          cards.forEach((c, i) => {
+            c.classList.remove('fade-up-card');
+            c.style.animationDelay = '';
+            void c.offsetWidth;
+            c.style.animationDelay = `${(i * 0.06).toFixed(2)}s`;
+            c.classList.add('fade-up-card');
+            c.addEventListener('animationend', function done() { c.classList.remove('fade-up-card'); c.style.animationDelay = ''; c.removeEventListener('animationend', done); });
+          });
+
+          // Prepare share image in the background so the save tap is instant
+          buildShareImage(r).then((blob) => {
+            if (state.currentResult === r && blob) { state.shareBlob = blob; state.shareBlobFor = r; }
+          }).catch(() => {});
+        }
+
+        let scoreAnimId = 0;
+        function runScoreAnimation(score, level) {
+          const myId = ++scoreAnimId;
+          const valEl = $('scoreValue');
+          const bar = $('scoreProgressBar');
+          const cat = $('resultCatImg');
+          if (cat) { cat.style.visibility = 'visible'; cat.src = CAT_IMAGES.mid; cat.classList.remove('pop-in'); }
+          if (valEl) valEl.textContent = '0';
+          if (bar) bar.style.width = '0%';
+          const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          const finish = () => {
+            if (myId !== scoreAnimId) return;
+            if (valEl) valEl.textContent = String(score);
+            if (bar) bar.style.width = `${Math.max(4, score)}%`;
+            if (cat) { cat.src = CAT_IMAGES[level]; void cat.offsetWidth; cat.classList.add('pop-in'); }
+            if (navigator.vibrate) { try { navigator.vibrate(30); } catch (e) {} }
+          };
+          if (reduce) { finish(); return; }
+          const start = performance.now();
+          const dur = 1200;
+          const step = (now) => {
+            if (myId !== scoreAnimId) return;
+            const p = Math.min(1, (now - start) / dur);
+            const e = 1 - Math.pow(1 - p, 3);
+            const v = Math.round(e * score);
+            if (valEl) valEl.textContent = String(v);
+            if (bar) bar.style.width = `${Math.max(4, v)}%`;
+            if (p < 1) requestAnimationFrame(step); else finish();
+          };
+          requestAnimationFrame(step);
+        }
+
+        on('btnNewScan', 'click', () => {
+          state.imageBase64 = null;
+          if (captureInput) captureInput.value = '';
+          hide($('capturePreviewBox'));
+          show($('captureDropzone'));
+          state.fileData = null; state.me = null; state.partner = null;
+          hide($('filePreviewCard'));
+          show($('fileDropzone'));
+          fileNotice('');
+          hideError();
+          setView('input');
+          updateCTA();
+        });
+        on('btnBackToHistory', 'click', () => openHistory());
+
+        // ---------------------------------------------------------------
+        // Share image (drawn directly on canvas: reliable on mobile)
+        // ---------------------------------------------------------------
+        function roundRect(ctx, x, y, w, h, r) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.arcTo(x + w, y, x + w, y + h, r);
+          ctx.arcTo(x + w, y + h, x, y + h, r);
+          ctx.arcTo(x, y + h, x, y, r);
+          ctx.arcTo(x, y, x + w, y, r);
+          ctx.closePath();
+        }
+        function wrapLines(ctx, text, maxWidth, maxLines) {
+          const out = [];
+          const paragraphs = String(text || '').replace(/\s+/g, ' ').trim().split('\n');
+          for (const para of paragraphs) {
+            const words = para.split(' ');
+            let line = '';
+            for (const word of words) {
+              const test = line ? line + ' ' + word : word;
+              if (ctx.measureText(test).width <= maxWidth) { line = test; continue; }
+              if (line) { out.push(line); line = ''; }
+              // word longer than a line: split by characters
+              let chunk = '';
+              for (const ch of word) {
+                if (ctx.measureText(chunk + ch).width > maxWidth) { out.push(chunk); chunk = ch; } else chunk += ch;
+              }
+              line = chunk;
+            }
+            if (line) out.push(line);
+          }
+          if (out.length > maxLines) {
+            const cut = out.slice(0, maxLines);
+            let last = cut[maxLines - 1];
+            while (last.length && ctx.measureText(last + '\u2026').width > maxWidth) last = last.slice(0, -1);
+            cut[maxLines - 1] = last + '\u2026';
+            return cut;
+          }
+          return out;
+        }
+
+        async function buildShareImage(r) {
+          try {
+            if (document.fonts) {
+              await Promise.all([
+                document.fonts.load('80px "Jua"'),
+                document.fonts.load('700 40px "Pretendard"'),
+                document.fonts.load('400 40px "Pretendard"'),
+              ]).catch(() => {});
+            }
+          } catch (e) {}
+          const isEveryday = r.chat_type === 'everyday_routine';
+          const score = Math.max(0, Math.min(100, Math.round(Number(r.temperature) || 0)));
+          const level = isEveryday ? 'mid' : scoreLevel(score);
+          const title = indexTitle(relGroup(r.relationship));
+          const catImg = await loadImage(CAT_IMAGES[level]);
+
+          const W = 1080, H = 1440;
+          const canvas = document.createElement('canvas');
+          canvas.width = W; canvas.height = H;
+          const ctx = canvas.getContext('2d');
+          const JUA = '"Jua", "Pretendard", sans-serif';
+          const PRE = '"Pretendard", -apple-system, sans-serif';
+
+          ctx.fillStyle = C.cream; ctx.fillRect(0, 0, W, H);
+          // card
+          ctx.fillStyle = '#FFFFFF';
+          roundRect(ctx, 60, 60, W - 120, H - 120, 48); ctx.fill();
+          ctx.strokeStyle = C.border; ctx.lineWidth = 3; ctx.stroke();
+
+          // header
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillStyle = C.coral; ctx.font = `64px ${JUA}`; ctx.textAlign = 'left';
+          ctx.fillText('TALK-CATCH', 120, 180);
+          ctx.fillStyle = C.sub; ctx.font = `400 30px ${PRE}`; ctx.textAlign = 'right';
+          ctx.fillText([r.relationship || '관계 미선택', fmtDate(r.createdAt)].join(' · '), W - 120, 178);
+
+          // cat
+          const catSize = 340;
+          if (catImg) ctx.drawImage(catImg, (W - catSize) / 2, 215, catSize, catSize);
+
+          let y = 600;
+          ctx.textAlign = 'center';
+          if (isEveryday) {
+            ctx.fillStyle = C.coral; ctx.font = `700 34px ${PRE}`;
+            ctx.fillText('일상 대화', W / 2, y + 10);
+            ctx.fillStyle = C.ink; ctx.font = `64px ${JUA}`;
+            ctx.fillText('편안한 대화예요', W / 2, y + 100);
+            y += 150;
+          } else {
+            ctx.fillStyle = C.sub; ctx.font = `700 34px ${PRE}`;
+            ctx.fillText(`${title} · ${scoreBadgeText(score, title)}`, W / 2, y + 10);
+            ctx.fillStyle = C.ink; ctx.font = `150px ${JUA}`;
+            const scoreStr = String(score);
+            const sw = ctx.measureText(scoreStr).width;
+            ctx.font = `64px ${JUA}`;
+            const pw = ctx.measureText('%').width;
+            const startX = W / 2 - (sw + pw + 8) / 2;
+            ctx.textAlign = 'left';
+            ctx.font = `150px ${JUA}`; ctx.fillStyle = C.ink; ctx.fillText(scoreStr, startX, y + 160);
+            ctx.font = `64px ${JUA}`; ctx.fillStyle = C.coral; ctx.fillText('%', startX + sw + 8, y + 160);
+            ctx.textAlign = 'center';
+            // bar
+            const bx = 180, bw = W - 360, by = y + 200;
+            ctx.fillStyle = C.chip; roundRect(ctx, bx, by, bw, 22, 11); ctx.fill();
+            ctx.fillStyle = C.coral; roundRect(ctx, bx, by, Math.max(22, (bw * score) / 100), 22, 11); ctx.fill();
+            y = by + 40;
+          }
+
+          // summary
+          const summary = r.summary || r.subtext || '';
+          ctx.fillStyle = C.ink; ctx.font = `700 40px ${PRE}`; ctx.textAlign = 'center';
+          const sLines = wrapLines(ctx, summary, W - 280, 2);
+          sLines.forEach((ln, i) => ctx.fillText(ln, W / 2, y + 60 + i * 56));
+          y += 60 + sLines.length * 56;
+
+          // tags
+          const tags = (r.status_tags || []).slice(0, 3).map((t) => '#' + String(t).replace(/^[#\s]+/, '').trim()).filter((t) => t.length > 1);
+          if (tags.length) {
+            ctx.font = `600 30px ${PRE}`;
+            const pad = 26, gap = 14;
+            const widths = tags.map((t) => ctx.measureText(t).width + pad * 2);
+            let total = widths.reduce((a, b) => a + b, 0) + gap * (tags.length - 1);
+            let x = (W - Math.min(total, W - 200)) / 2;
+            const ty = y + 20;
+            tags.forEach((t, i) => {
+              if (x + widths[i] > W - 100) return;
+              ctx.fillStyle = C.chip; roundRect(ctx, x, ty, widths[i], 56, 28); ctx.fill();
+              ctx.fillStyle = C.chipText; ctx.textAlign = 'center'; ctx.fillText(t, x + widths[i] / 2, ty + 38);
+              x += widths[i] + gap;
+            });
+            y = ty + 56;
+          }
+
+          // best reply
+          const rp = r.replies || {};
+          const best = isEveryday ? rp.polite : level === 'high' ? rp.charm : level === 'mid' ? rp.polite : rp.cut;
+          if (best) {
+            const boxY = y + 40;
+            ctx.font = `400 34px ${PRE}`;
+            const rLines = wrapLines(ctx, `"${best}"`, W - 340, 2);
+            const boxH = 90 + rLines.length * 48;
+            ctx.fillStyle = C.cream; roundRect(ctx, 120, boxY, W - 240, boxH, 28); ctx.fill();
+            ctx.strokeStyle = C.border; ctx.lineWidth = 2; ctx.stroke();
+            ctx.textAlign = 'left'; ctx.fillStyle = C.coral; ctx.font = `700 28px ${PRE}`;
+            ctx.fillText('추천 답장', 160, boxY + 52);
+            ctx.fillStyle = C.ink; ctx.font = `400 34px ${PRE}`;
+            rLines.forEach((ln, i) => ctx.fillText(ln, 160, boxY + 104 + i * 48));
+          }
+
+          // footer
+          ctx.textAlign = 'center'; ctx.fillStyle = C.sub; ctx.font = `400 26px ${PRE}`;
+          ctx.fillText('TALK-CATCH · AI 메신저 대화 속마음 해독', W / 2, H - 92);
+
+          return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
+        }
+
+        function isMobileDevice() {
+          return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '') || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent || ''));
+        }
+        function showSaveOverlay(blob) {
+          const url = URL.createObjectURL(blob);
+          const img = $('saveOverlayImg');
+          if (img) img.src = url;
+          show($('saveOverlay'));
+        }
+        on('btnCloseSaveOverlay', 'click', () => hide($('saveOverlay')));
+
+        on('btnSaveImage', 'click', async () => {
+          const r = state.currentResult;
+          if (!r) return;
+          const btn = $('btnSaveImage');
+          let blob = state.shareBlobFor === r ? state.shareBlob : null;
+          if (!blob) {
+            if (btn) btn.disabled = true;
+            setText('btnSaveImageText', '이미지 만드는 중...');
+            try { blob = await buildShareImage(r); } catch (e) { blob = null; }
+            if (btn) btn.disabled = false;
+            setText('btnSaveImageText', '결과 이미지 저장');
+            if (!blob) { toast('이미지를 만들지 못했어요. 다시 시도해 주세요'); return; }
+            state.shareBlob = blob; state.shareBlobFor = r;
+          }
+          const fileName = `talk-catch-${Date.now()}.png`;
+          const ua = (navigator.userAgent || '').toUpperCase();
+          if (ua.includes('KAKAOTALK')) { showSaveOverlay(blob); return; }
+          if (isMobileDevice()) {
+            try {
+              const file = new File([blob], fileName, { type: 'image/png' });
+              if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: 'TALK-CATCH 결과' });
+                toast('저장 또는 공유를 완료했어요');
+                return;
+              }
+            } catch (e) {
+              if (e && e.name === 'AbortError') return;
+            }
+            showSaveOverlay(blob);
+            return;
+          }
+          try {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = fileName;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 4000);
+            toast('결과 이미지를 저장했어요');
+          } catch (e) {
+            showSaveOverlay(blob);
+          }
+        });
+
+        // ---------------------------------------------------------------
+        // History
+        // ---------------------------------------------------------------
+        function readHistory() {
+          try {
+            const list = JSON.parse(storage.get(HISTORY_KEY) || '[]');
+            return Array.isArray(list) ? list : [];
+          } catch (e) { return []; }
+        }
+        function writeHistory(list) {
+          let l = list.slice(0, MAX_HISTORY);
+          while (l.length) {
+            if (storage.set(HISTORY_KEY, JSON.stringify(l))) return true;
+            l = l.slice(0, -1);
+          }
+          storage.remove(HISTORY_KEY);
+          return false;
+        }
+        function saveHistory(r) {
+          const item = {
+            id: String(r.createdAt || Date.now()),
+            createdAt: r.createdAt || Date.now(),
+            mode: r.mode,
+            relationship: r.relationship || null,
+            mbti: r.mbti || '',
+            chat_type: r.chat_type,
+            temperature: r.temperature,
+            confidence: r.confidence,
+            summary: r.summary,
+            subtext: r.subtext,
+            status_tags: r.status_tags,
+            timing_insight: r.timing_insight,
+            replies: r.replies,
+            warning: r.warning,
+            stats: r.stats || null,
+          };
+          writeHistory([item].concat(readHistory().filter((x) => x.id !== item.id)));
+          updateHistoryCount();
+        }
+        function updateHistoryCount() { setText('navHistoryLabel', readHistory().length); }
+
+        let undoState = null;
+        function renderHistory() {
+          const box = $('historyListContainer');
+          if (!box) return;
+          box.innerHTML = '';
+          const list = readHistory();
+          renderClearArea(list.length);
+          if (!list.length) {
+            const empty = document.createElement('div');
+            empty.className = 'rounded-[20px] p-6 bg-white border border-[#EDE6DC] flex flex-col items-center gap-2 text-center';
+            const img = document.createElement('img');
+            img.src = CAT_IMAGES.reading; img.alt = ''; img.className = 'w-20 h-20 object-contain'; img.crossOrigin = 'anonymous';
+            const p = document.createElement('p');
+            p.className = 'text-[14px] font-semibold text-[#57534E]'; p.textContent = '아직 해독한 대화가 없어요';
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'mt-1 h-11 px-5 rounded-xl bg-[#FF6452] text-white text-[14px] font-bold'; b.textContent = '첫 대화 해독하기';
+            b.addEventListener('click', () => setView('input'));
+            empty.append(img, p, b);
+            box.appendChild(empty);
+            return;
+          }
+          list.forEach((item) => {
+            const rel = normalizeRel(item.relationship);
+            const isEveryday = item.chat_type === 'everyday_routine';
+            const level = isEveryday ? 'mid' : scoreLevel(item.temperature);
+            const card = document.createElement('div');
+            card.className = 'rounded-[16px] p-3 bg-white border border-[#EDE6DC] flex items-center gap-3';
+            const open = document.createElement('button');
+            open.type = 'button';
+            open.className = 'flex-1 min-w-0 flex items-center gap-3 text-left';
+            const img = document.createElement('img');
+            img.src = CAT_IMAGES[level]; img.alt = ''; img.crossOrigin = 'anonymous';
+            img.className = 'w-12 h-12 object-contain shrink-0';
+            const mid = document.createElement('div');
+            mid.className = 'flex-1 min-w-0';
+            const meta = document.createElement('p');
+            meta.className = 'text-[12px] text-[#78716C] truncate';
+            meta.textContent = `${item.mode === 'file' ? '심층' : '캡처'} · ${rel || '관계 미선택'} · ${fmtDate(item.createdAt)}`;
+            const sum = document.createElement('p');
+            sum.className = 'text-[14px] font-semibold text-[#1C1917] truncate';
+            sum.textContent = item.summary || item.subtext || '분석 결과';
+            mid.append(meta, sum);
+            const score = document.createElement('span');
+            score.className = 'shrink-0 text-[13px] font-bold px-2 py-0.5 rounded-lg bg-[#FFF0EC] text-[#FF6452]';
+            score.textContent = isEveryday ? '일상' : `${Math.round(Number(item.temperature) || 0)}%`;
+            open.append(img, mid, score);
+            open.addEventListener('click', () => {
+              state.openedFromHistory = true;
+              renderResult(Object.assign({}, item, { relationship: rel }));
+            });
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.setAttribute('aria-label', '이 기록 삭제');
+            del.className = 'w-10 h-10 shrink-0 rounded-lg flex items-center justify-center text-[#78716C] active:bg-[#F5EFE6]';
+            del.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>';
+            del.addEventListener('click', () => deleteHistory(item.id));
+            card.append(open, del);
+            box.appendChild(card);
+          });
+        }
+
+        function renderClearArea(count) {
+          const area = $('clearHistoryArea');
+          if (!area) return;
+          area.innerHTML = '';
+          if (!count) return;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'h-9 px-3 rounded-lg text-[13px] font-semibold text-[#78716C] bg-[#F5EFE6]';
+          b.textContent = '전체 비우기';
+          b.addEventListener('click', () => {
+            area.innerHTML = '';
+            const yes = document.createElement('button');
+            yes.type = 'button'; yes.className = 'h-9 px-3 rounded-lg text-[13px] font-bold text-white bg-[#FF6452]'; yes.textContent = '비우기';
+            yes.addEventListener('click', () => { writeHistory([]); storage.remove(HISTORY_KEY); updateHistoryCount(); renderHistory(); toast('기록을 모두 지웠어요'); });
+            const no = document.createElement('button');
+            no.type = 'button'; no.className = 'h-9 px-3 rounded-lg text-[13px] font-semibold text-[#57534E] bg-[#F5EFE6]'; no.textContent = '취소';
+            no.addEventListener('click', () => renderClearArea(readHistory().length));
+            area.append(yes, no);
+          });
+          area.appendChild(b);
+        }
+
+        function deleteHistory(id) {
+          const list = readHistory();
+          const idx = list.findIndex((x) => x.id === id);
+          if (idx < 0) return;
+          const removed = list.splice(idx, 1)[0];
+          writeHistory(list);
+          updateHistoryCount();
+          renderHistory();
+          undoState = { item: removed, idx };
+          showUndoToast();
+        }
+        function showUndoToast() {
+          const el = $('toast');
+          if (!el) return;
+          const txt = $('toastText');
+          if (txt) {
+            txt.innerHTML = '';
+            const s = document.createElement('span'); s.textContent = '삭제했어요 · ';
+            const u = document.createElement('button');
+            u.type = 'button'; u.className = 'font-bold underline underline-offset-2'; u.textContent = '되돌리기';
+            u.addEventListener('click', () => {
+              if (!undoState) return;
+              const l = readHistory();
+              l.splice(Math.min(undoState.idx, l.length), 0, undoState.item);
+              writeHistory(l);
+              undoState = null;
+              updateHistoryCount();
+              renderHistory();
+              hide(el);
+            });
+            txt.append(s, u);
+          }
+          show(el);
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(() => { hide(el); undoState = null; }, 5000);
+        }
+
+        function openHistory() { renderHistory(); setView('history'); }
+
+        on('navTabAnalyze', 'click', () => {
+          if (state.view === 'loading') return;
+          if (state.currentResult && state.view === 'history' && !state.openedFromHistory) { setView('result'); return; }
+          setView('input');
+        });
+        on('navTabHistory', 'click', () => { if (state.view !== 'loading') openHistory(); });
+
+        // ---------------------------------------------------------------
+        // API key modal
+        // ---------------------------------------------------------------
+        const keyInput = $('apiKeyInput');
+        if (keyInput) keyInput.value = storage.get(API_KEY_STORE) || '';
+        on('btnOpenKeyModal', 'click', () => show($('keyModal')));
+        on('btnCloseKeyModal', 'click', () => hide($('keyModal')));
+        on('btnSaveKey', 'click', () => {
+          const v = (keyInput && keyInput.value.trim()) || '';
+          v ? storage.set(API_KEY_STORE, v) : storage.remove(API_KEY_STORE);
+          toast(v ? 'API 키를 저장했어요' : '서버 기본 키를 사용해요');
+          hide($('keyModal'));
+        });
+        on('btnResetKey', 'click', () => { if (keyInput) keyInput.value = ''; storage.remove(API_KEY_STORE); toast('API 키를 지웠어요'); });
+
+        // ---------------------------------------------------------------
+        // Init
+        // ---------------------------------------------------------------
+        fetch('/api/health').catch(() => {});
+        setMode('capture');
+        renderRelChips();
+        renderMbti();
+        updateHistoryCount();
+        setView('input');
+      })();
+    </script>
+  </body>
+</html>

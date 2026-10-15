@@ -1,0 +1,6 @@
+{
+  "name": "TALK-CATCH",
+  "description": "카톡 및 SNS 대화 캡처 이미지를 분석해 상대방의 진짜 속마음과 호감도를 측정하고 맞춤 답장을 추천해 주는 웹 서비스",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
