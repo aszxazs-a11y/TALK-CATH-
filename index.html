@@ -1170,7 +1170,10 @@
 - 같은 대화에는 항상 같은 기준으로 같은 점수를 줄 것.
 
 [출력 항목]
-- chat_type: 'everyday_routine'(안부·밥·날씨·단순 정보만 있고 특별한 뉘앙스가 없음) 또는 'meaningful'
+- chat_type: 기본값은 'meaningful'.
+  'everyday_routine'은 안부·밥·날씨·단순 일정 확인처럼 가볍고 감정 신호가 전혀 없는 대화에만 쓸 것.
+  불만, 질책, 짜증, 서운함, 사과, 거절, 갈등, 부탁, 업무 지적, 늦은 시간 연락에 대한 불편함, 호감 표현이 하나라도 있으면 반드시 'meaningful'.
+  직장 대화에서 상사·동료가 불편함이나 지적을 표현하면 'meaningful'이고 점수는 50 미만으로 줄 것.
 - summary: 한 줄 결론, 35자 이내
 - subtext: 상대 속마음 해석 2~3문장, 150자 이내
 - status_tags: 상대 상태를 요약하는 단어 2~4개
@@ -1249,6 +1252,7 @@ ${COMMON_RULES}`;
           d.confidence = ['low', 'medium', 'high'].includes(d.confidence) ? d.confidence : 'medium';
           const t = Number(d.temperature);
           d.temperature = isFinite(t) ? Math.max(0, Math.min(100, Math.round(t))) : 50;
+          if (d.chat_type === 'everyday_routine' && d.temperature < 50) d.chat_type = 'meaningful';
           d.status_tags = (Array.isArray(d.status_tags) ? d.status_tags : []).map((x) => String(x || '').replace(/^[#\s]+/, '').trim()).filter(Boolean).slice(0, 4);
           d.summary = txt(d.summary, '대화의 흐름을 바탕으로 정리한 결과예요.');
           d.subtext = txt(d.subtext, '대화의 맥락과 말투를 바탕으로 해석한 결과예요.');
@@ -1478,8 +1482,8 @@ ${COMMON_RULES}`;
 
           const group = relGroup(r.relationship);
           const title = indexTitle(group);
-          const isEveryday = r.chat_type === 'everyday_routine';
           const score = Math.max(0, Math.min(100, Math.round(Number(r.temperature) || 0)));
+          const isEveryday = r.chat_type === 'everyday_routine' && score >= 50;
           const level = scoreLevel(score);
 
           // History back bar
@@ -1668,8 +1672,8 @@ ${COMMON_RULES}`;
               ]).catch(() => {});
             }
           } catch (e) {}
-          const isEveryday = r.chat_type === 'everyday_routine';
           const score = Math.max(0, Math.min(100, Math.round(Number(r.temperature) || 0)));
+          const isEveryday = r.chat_type === 'everyday_routine' && score >= 50;
           const level = isEveryday ? 'mid' : scoreLevel(score);
           const title = indexTitle(relGroup(r.relationship));
           const catImg = await loadImage(CAT_IMAGES[level]);
@@ -1892,7 +1896,7 @@ ${COMMON_RULES}`;
           }
           list.forEach((item) => {
             const rel = normalizeRel(item.relationship);
-            const isEveryday = item.chat_type === 'everyday_routine';
+            const isEveryday = item.chat_type === 'everyday_routine' && (Number(item.temperature) || 0) >= 50;
             const level = isEveryday ? 'mid' : scoreLevel(item.temperature);
             const card = document.createElement('div');
             card.className = 'rounded-[16px] p-3 bg-white border border-[#EDE6DC] flex items-center gap-3';
